@@ -1,7 +1,9 @@
 use crate::i18n::{self, Language};
 use crate::models::{Project, SceneDims, SelectedTab, SensorPos};
+use crate::data;
 use calamine::{open_workbook_auto, Data, Reader};
 use std::fs::File;
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::Path;
 
 pub mod chart;
@@ -247,7 +249,7 @@ impl ViewState {
                 }
             }
         } else {
-            let file = match File::open(path) {
+            let mut file = match File::open(path) {
                 Ok(f) => f,
                 Err(e) => {
                     self.csv_load_error = Some(format!(
@@ -259,9 +261,19 @@ impl ViewState {
                 }
             };
 
+            // Rileva il separatore (`,` o `;`) dalla sola prima riga, poi
+            // riporta il cursore all'inizio per far leggere tutto al reader.
+            let separatore = {
+                let mut prima_riga = String::new();
+                let _ = BufReader::new(&mut file).read_line(&mut prima_riga);
+                data::detect_separator(&prima_riga)
+            };
+            let _ = file.seek(SeekFrom::Start(0));
+
             let mut rdr = csv::ReaderBuilder::new()
                 .has_headers(true)
                 .flexible(true)
+                .delimiter(separatore)
                 .from_reader(file);
 
             if let Ok(headers) = rdr.headers() {
@@ -359,6 +371,34 @@ mod tests {
         // Nessun dato vecchio o nuovo deve essere stato caricato.
         assert!(vs.csv_headers.is_empty());
         assert!(vs.csv_rows.is_empty());
+        let _ = std::fs::remove_file(&percorso);
+    }
+
+    /// Un file separato da `;` con virgola decimale viene letto correttamente:
+    /// il separatore è rilevato dalla prima riga, e i valori restano numerici.
+    #[test]
+    fn file_con_separatore_punto_e_virgola() {
+        let contenuto = "Data;Ora;Sensore_1;Sensore_2\n2024-01-01;10:00;21,5;22,0\n2024-01-01;11:00;20,5;21,0\n";
+        let percorso = csv_temporaneo("thermite_semicolon.csv", contenuto.as_bytes());
+
+        let mut vs = ViewState::new();
+        vs.lang = crate::i18n::Language::It;
+        vs.active_project = Some(progetto(&percorso, None));
+        vs.load_data_file();
+
+        assert_eq!(vs.csv_load_error, None, "errore: {:?}", vs.csv_load_error);
+        assert_eq!(vs.csv_headers, vec!["Data", "Ora", "Sensore_1", "Sensore_2"]);
+        assert_eq!(vs.csv_rows.len(), 2);
+        assert_eq!(vs.csv_rows[0], vec!["2024-01-01", "10:00", "21,5", "22,0"]);
+
+        // La virgola decimale deve produrre numeri veri, non celle spezzate.
+        let series = crate::data::parse_series(&vs.csv_headers, &vs.csv_rows);
+        assert_eq!(series.len(), 2);
+        assert_eq!(series[0].name, "Sensore_1");
+        assert_eq!(series[0].points.len(), 2);
+        assert_eq!(series[0].points[0][1], 21.5, "virgola decimale non convertita");
+        assert_eq!(series[1].points[1][1], 21.0);
+
         let _ = std::fs::remove_file(&percorso);
     }
 

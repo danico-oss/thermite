@@ -74,6 +74,49 @@ pub fn parse_number(value: &str) -> Option<f64> {
     cleaned.parse::<f64>().ok()
 }
 
+/// Rileva il separatore di campo di un file CSV guardando la sua prima riga.
+///
+/// Conta le occorrenze di `,` e `;` che stanno **fuori** dalle virgolette e
+/// restituisce la più frequente: così un file europeo separato da `;` con
+/// virgola decimale (`01/06/2026;08:00;18,5`) viene letto correttamente.
+///
+/// A parità di conteggio vince la virgola, che è il separatore storico e quello
+/// usato da `data/test.csv`. Se la riga è vuota restituisce comunque la
+/// virgola, comportamento predefinito del crate `csv`.
+///
+/// L'analisi è sulle sole righe di intestazione: una riga di dati non viene mai
+/// esaminata, quindi un campo testuale contente `;` non può ingannare il
+/// rilevamento.
+pub fn detect_separator(prima_riga: &str) -> u8 {
+    let bytes = prima_riga.as_bytes();
+    let mut virgole = 0usize;
+    let mut punti_e_virgola = 0usize;
+    let mut dentro_virgolette = false;
+    let mut i = 0;
+
+    while i < bytes.len() {
+        match bytes[i] {
+            // Fine riga: il separatore non può trovarsi oltre.
+            b'\n' | b'\r' => break,
+            b'"' => {
+                // Una coppia di virgolette dentro un campo è un escape (`""`),
+                // non una chiusura.
+                if dentro_virgolette && i + 1 < bytes.len() && bytes[i + 1] == b'"' {
+                    i += 2;
+                    continue;
+                }
+                dentro_virgolette = !dentro_virgolette;
+            }
+            b',' if !dentro_virgolette => virgole += 1,
+            b';' if !dentro_virgolette => punti_e_virgola += 1,
+            _ => {}
+        }
+        i += 1;
+    }
+
+    if punti_e_virgola > virgole { b';' } else { b',' }
+}
+
 /// Costruisce le serie a partire dall'intestazione (data, ora, sensori...) e dalle righe.
 pub fn parse_series(headers: &[String], rows: &[Vec<String>]) -> Vec<Series> {
     let mut series: Vec<Series> = headers
@@ -276,5 +319,66 @@ mod tests {
         let series = parse_series(&headers, &rows);
         assert!(series[0].points.is_empty());
         assert_eq!(series[1].points.len(), 2);
+    }
+
+    // --- Rilevamento del separatore di campo ---
+
+    #[test]
+    fn separatore_virgola_quando_usata() {
+        assert_eq!(detect_separator("Data,Ora,Sensore_1,Sensore_2"), b',');
+        assert_eq!(detect_separator("Data,Ora"), b',');
+    }
+
+    #[test]
+    fn separatore_punto_e_virgola_quando_usato() {
+        assert_eq!(detect_separator("Data;Ora;Sensore_1;Sensore_2"), b';');
+        assert_eq!(detect_separator("Data;Ora"), b';');
+    }
+
+    /// All'uguaglianza dei conteggi vince la virgola, separatore storico.
+    #[test]
+    fn separatore_pari_conteggi_vince_la_virgola() {
+        assert_eq!(detect_separator("a,b;c"), b',');
+    }
+
+    /// Una riga vuota (o solo a capo) non deve scegliere a caso.
+    #[test]
+    fn separatore_riga_vuota() {
+        assert_eq!(detect_separator(""), b',');
+        assert_eq!(detect_separator("\n"), b',');
+        assert_eq!(detect_separator("\r\n"), b',');
+    }
+
+    /// I separatori racchiusi tra virgolette appartengono al campo, non sono
+    /// separatori: senza questo controllo un file separato da virgola con un
+    /// campo che contiene un `;` verrebbe scambiato per file europeo.
+    #[test]
+    fn separatore_ignora_il_contenuto_delle_virgolette() {
+        // Un `;` dentro un campo non deve prevalere: il separatore è la virgola.
+        assert_eq!(detect_separator("\"Nota;urgente\",Ora,S1"), b',');
+        // Idem una virgola dentro un campo di un file separato da `;`.
+        assert_eq!(detect_separator("\"Nota,urgente\";Ora;S1"), b';');
+        // Un campo vuoto racchiuso in virgolette non altera nulla.
+        assert_eq!(detect_separator("\"\",Ora,S1"), b',');
+    }
+
+    /// Le virgolette doppie dentro un campo sono escape, non chiusura.
+    #[test]
+    fn separatore_virgolette_escape() {
+        assert_eq!(detect_separator("\"dici \"\"sì\"\"\",Ora,S1"), b',');
+    }
+
+    /// La prima riga va oltre il terminatore di riga: un campo più a destra
+    /// della testa non deve essere contato due volte o ignorato.
+    #[test]
+    fn separatore_si_ferma_alla_fine_riga() {
+        assert_eq!(detect_separator("Data;Ora;S1\n2026-06-01,08:00,18.5"), b';');
+    }
+
+    /// Estremi realistici: header europeo con virgola decimale nei dati.
+    #[test]
+    fn separatore_file_europeo_completo() {
+        let prima_riga = "Data;Ora;Sensore 1;Sensore 2";
+        assert_eq!(detect_separator(prima_riga), b';');
     }
 }

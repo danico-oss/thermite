@@ -43,7 +43,7 @@ dei sensori** e vengono usati per le etichette del grafico e per la mappa 3D,
 dove ogni sensore va posizionato sul container. Le due celle di intestazione
 delle colonne 1 e 2 vengono ignorate.
 
-Esempio (`data/test.csv`):
+Esempio con separatore virgola (`data/test.csv`):
 
 ```csv
 Data,Ora,Sensore_1,Sensore_2
@@ -51,6 +51,23 @@ Data,Ora,Sensore_1,Sensore_2
 2026-06-01,09:00:00,20.1,21.0
 2026-06-01,10:00:00,22.4,22.8
 ```
+
+### Separatore di campo
+
+Si accettano sia la **virgola `,`** che il **punto e virgola `;`**, rilevati
+automaticamente dalla prima riga del file: non va indicato nulla. Un file
+europeo classico, con `;` come separatore e virgola decimale, si legge senza
+conversioni:
+
+```csv
+Data;Ora;Sensore_1;Sensore_2
+2026-06-01;08:00:00;18,5;19,2
+2026-06-01;09:00:00;20,1;21,0
+```
+
+Il rilevamento conta i separatori **fuori** dalle virgolette sulla sola riga di
+intestazione, quindi un campo testuale che contenga una virgola o un `;` non
+può ingannarlo. A parità di conteggi vince la virgola.
 
 ### Format di data e ora
 
@@ -85,11 +102,11 @@ in uno di questi formati, e l'ora viene impostata a mezzanotte:
 
 ### Limiti da ricordare
 
-- **Il separatore di campo è la virgola `,`.** Un file con punto e virgola
-  (`01/06/2026;08:00;18,5`) non viene letto correttamente: va convertito.
 - La prima riga è sempre interpretata come intestazione, quindi non va omessa e
   non deve contenere dati.
 - Per i file Excel viene usato il primo foglio.
+- Il separatore può essere `,` o `;`, ma **non il tabulatore**: un file TSV va
+  convertito.
 
 ## Compilazione
 
