@@ -374,6 +374,71 @@ mod tests {
         let _ = std::fs::remove_file(&percorso);
     }
 
+    /// L'archivio di dati fasulli consegnato con il progetto deve caricarsi
+    /// per intero: 25 registrazioni orarie, 4 sensori, valori tutti fra 2 e 8.
+    ///
+    /// Verifica anche l'ora limite `24:00:00` (mezzanotte di fine giornata,
+    /// valida in ISO 8601): se il parser la rifiutasse, l'ultima riga
+    /// sparirebbe in silenzio da grafico e mappa 3D.
+    #[test]
+    fn archivio_dati_fasulli_si_carica_per_intero() {
+        let percorso = "data/dati_fasulli_17-10-2026.csv";
+        assert!(
+            std::path::Path::new(percorso).exists(),
+            "manca l'archivio di prova: {percorso}"
+        );
+
+        let mut vs = ViewState::new();
+        vs.lang = crate::i18n::Language::It;
+        vs.active_project = Some(progetto(percorso, None));
+        vs.load_data_file();
+
+        assert_eq!(vs.csv_load_error, None, "errore: {:?}", vs.csv_load_error);
+        assert_eq!(
+            vs.csv_headers,
+            vec!["Data", "Ora", "Sensore_1", "Sensore_2", "Sensore_3", "Sensore_4"]
+        );
+        assert_eq!(vs.csv_rows.len(), 25, "attese 25 registrazioni orarie");
+
+        let series = crate::data::parse_series(&vs.csv_headers, &vs.csv_rows);
+        assert_eq!(series.len(), 4, "attesi 4 sensori");
+        for s in &series {
+            assert_eq!(
+                s.points.len(),
+                25,
+                "sensore {}: qualche ora non è stata convertita",
+                s.name
+            );
+            for p in &s.points {
+                assert!(
+                    (2.0..=8.0).contains(&p[1]),
+                    "sensore {}: valore {} fuori dall'intervallo 2-8",
+                    s.name,
+                    p[1]
+                );
+            }
+        }
+
+        // La riga 24:00:00 è la mezzanotte di fine giornata: deve cadere 24 ore
+        // dopo la prima, non sovrapporsi ad essa.
+        let prima = series[0].points.first().expect("serie vuota");
+        let ultima = series[0].points.last().expect("serie vuota");
+        assert_eq!(
+            crate::data::format_timestamp(prima[0]),
+            "17/10/2026 00:00"
+        );
+        assert_eq!(
+            crate::data::format_timestamp(ultima[0]),
+            "18/10/2026 00:00",
+            "la riga 24:00:00 non è stata interpretata come fine giornata"
+        );
+        assert_eq!(
+            (ultima[0] - prima[0]) / 3600.0,
+            24.0,
+            "le 25 registrazioni devono coprire 24 ore"
+        );
+    }
+
     /// Un file separato da `;` con virgola decimale viene letto correttamente:
     /// il separatore è rilevato dalla prima riga, e i valori restano numerici.
     #[test]

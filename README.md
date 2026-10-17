@@ -92,6 +92,26 @@ in uno di questi formati, e l'ora viene impostata a mezzanotte:
 
 `2026-06-01` · `01/06/2026` · `01-06-2026` · `2026/06/01`
 
+### L'ora 24:00
+
+L'orario `24:00:00` è valido e indica la mezzanotte che **chiude** la giornata,
+come nell'ISO 8601. Viene interpretato come le `00:00:00` del giorno seguente,
+quindi un registro che va da `00:00:00` a `24:00:00` copre 24 ore intere con
+25 righe, e l'ultimo campione non finisce sovrapposto al primo.
+
+Funziona sia nella colonna 2 sia quando data e ora stanno insieme nella colonna 1
+(`2026-06-01 24:00:00`).
+
+### Archivio di prova
+
+`data/dati_fasulli_17-10-2026.csv` è un file di esempio pronto all'uso: una
+giornata intera (17/10/2026), un registro per ora da `00:00:00` a `24:00:00`,
+4 sensori con valori casuali fra 2 e 8 °C. Usa separatore `;` e virgola
+decimale, per provare anche il rilevamento automatico del separatore.
+
+È generato con un seme fisso (`genera_dati_fasulli.ps1`), quindi il contenuto
+non cambia mai da una rigenerazione all'altra.
+
 ### Valori numerici
 
 - Sono accettati sia il punto che la **virgola decimale**: `18.5` e `18,5`

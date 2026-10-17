@@ -41,28 +41,69 @@ pub fn parse_timestamp(date_str: &str, time_str: &str) -> Option<f64> {
     let date_str = date_str.trim();
     let time_str = time_str.trim();
 
+    // L'ora 24 designa in ISO 8601 la mezzanotte di fine giornata, ma la
+    // libreria chrono ammette solo 00-23 e rifiuta il testo per intero. Senza
+    // questa conversione la riga cadrebbe sul fallback «sola data», finendo
+    // sovrapposta alla mezzanotte di inizio giorno: il campione non verrebbe
+    // perso, ma scatterebbe di 24 ore a sinistra su grafico e mappa.
+    // La conversione vale sia per la colonna ora sia per una cella unica che
+    // contenga già «data ora», come documentato nel README.
+    let (date_norm, ore_date) = normalizza_ora_24(date_str);
+    let (time_norm, ore_time) = normalizza_ora_24(time_str);
+    // In un file malformato entrambe le celle potrebbero portare «24»: si prende
+    // una sola volta, mai raddoppiata.
+    let ore_scarto = ore_date.max(ore_time);
+    let date_norm = date_norm.as_str();
+    let time_norm = time_norm.as_str();
+
     // La cella potrebbe contenere già "data ora" nella prima colonna.
     let mut candidates: Vec<String> = Vec::new();
-    if time_str.is_empty() {
-        candidates.push(date_str.to_string());
+    if time_norm.is_empty() {
+        candidates.push(date_norm.to_string());
     } else {
-        candidates.push(format!("{} {}", date_str, time_str));
+        candidates.push(format!("{} {}", date_norm, time_norm));
     }
-    candidates.push(date_str.to_string());
+    candidates.push(date_norm.to_string());
 
     for c in &candidates {
         for fmt in DATETIME_FORMATS {
             if let Ok(dt) = NaiveDateTime::parse_from_str(c, fmt) {
-                return Some(dt.and_utc().timestamp() as f64);
+                return Some(dt.and_utc().timestamp() as f64 + ore_scarto);
             }
         }
         for fmt in DATE_FORMATS {
             if let Ok(d) = chrono::NaiveDate::parse_from_str(c, fmt) {
-                return Some(d.and_hms_opt(0, 0, 0)?.and_utc().timestamp() as f64);
+                return Some(d.and_hms_opt(0, 0, 0)?.and_utc().timestamp() as f64 + ore_scarto);
             }
         }
     }
     None
+}
+
+/// Riscrive un orario `24:MM[:SS]` in `00:MM[:SS]` e restituisce i secondi da
+/// sommare al risultato (86400, cioè 24 ore), oppure il testo invariato e `0.0`.
+///
+/// Il «24» va riconosciuto solo quando è in testa al testo o segue uno spazio,
+/// così una data come `2024:...` o un nome sensore non vengono toccati.
+fn normalizza_ora_24(testo: &str) -> (String, f64) {
+    for (i, _) in testo.match_indices("24:") {
+        let in_testa = i == 0;
+        let dopo_spazio = i > 0 && testo.as_bytes()[i - 1] == b' ';
+        if !(in_testa || dopo_spazio) {
+            continue;
+        }
+        let resto = &testo[i + 3..];
+        // Deve esserci almeno una cifra di minuto, altrimenti non è un orario.
+        if !resto.starts_with(|c: char| c.is_ascii_digit()) {
+            continue;
+        }
+        let mut out = String::with_capacity(testo.len());
+        out.push_str(&testo[..i]);
+        out.push_str("00:");
+        out.push_str(resto);
+        return (out, 24.0 * 3600.0);
+    }
+    (testo.to_string(), 0.0)
 }
 
 /// Converte una cella in numero, tollerando la virgola come separatore decimale.
@@ -380,5 +421,75 @@ mod tests {
     fn separatore_file_europeo_completo() {
         let prima_riga = "Data;Ora;Sensore 1;Sensore 2";
         assert_eq!(detect_separator(prima_riga), b';');
+    }
+
+    // --- Orario di fine giornata ---
+
+    /// `24:00:00` è la mezzanotte che chiude la giornata in ISO 8601. Deve
+    /// valere 24 ore dopo la mezzanotte che la apre, non sovrapporsi ad essa:
+    /// in caso contrario l'ultimo campione del giorno finirebbe nello stesso
+    /// punto del primo su grafico e mappa 3D.
+    #[test]
+    fn ora_24_cade_a_fine_giornata() {
+        let apertura = parse_timestamp("17/10/2026", "00:00:00").unwrap();
+        let chiusura = parse_timestamp("17/10/2026", "24:00:00").unwrap();
+        assert_eq!(chiusura - apertura, 24.0 * 3600.0);
+    }
+
+    /// Anche con minuti e secondi, e con formati di data diversi da quelli
+    /// con la barra.
+    #[test]
+    fn ora_24_con_minuti_e_secondi() {
+        let a = parse_timestamp("2026-10-17", "23:59:59").unwrap();
+        let b = parse_timestamp("2026-10-17", "24:00:00").unwrap();
+        assert_eq!(b - a, 1.0, "24:00:00 deve valere un secondo dopo le 23:59:59");
+
+        let c = parse_timestamp("17-10-2026", "24:30:00").unwrap();
+        let d = parse_timestamp("17-10-2026", "00:30:00").unwrap();
+        assert_eq!(c - d, 24.0 * 3600.0);
+    }
+
+    /// L'ora 24 presente nella stessa cella della data va trattata come
+    /// nell'archivio con data e ora unite nella prima colonna.
+    #[test]
+    fn ora_24_nella_stessa_cella_della_data() {
+        let a = parse_timestamp("2026-10-17 23:00:00", "").unwrap();
+        let b = parse_timestamp("2026-10-17 24:00:00", "").unwrap();
+        assert_eq!(b - a, 3600.0);
+    }
+
+    /// Le ore ordinarie non devono essere toccate dalla conversione.
+    #[test]
+    fn ore_ordinarie_invariate() {
+        for h in ["00", "01", "09", "12", "21", "23"] {
+            let t = parse_timestamp("2026-10-17", &format!("{h}:00:00")).unwrap();
+            let dt = chrono::DateTime::from_timestamp(t as i64, 0).unwrap();
+            assert_eq!(dt.format("%H:%M").to_string(), format!("{h}:00"), "ora {h}");
+            assert_eq!(dt.format("%Y-%m-%d").to_string(), "2026-10-17", "ora {h}");
+        }
+    }
+
+    /// Un «24» che non è un'ora (anno, nome file, id) non deve essere convertito.
+    #[test]
+    fn ventiquattro_non_orario_non_toccato() {
+        // Anno 2024 in testa alla data: l'occorrenza "24:" non c'è, ma un anno
+        // seguito da due punti non deve mai essere riscritto.
+        let t = parse_timestamp("2024-06-01", "10:00:00").unwrap();
+        let dt = chrono::DateTime::from_timestamp(t as i64, 0).unwrap();
+        assert_eq!(dt.format("%Y-%m-%d").to_string(), "2024-06-01");
+        assert_eq!(dt.format("%H:%M").to_string(), "10:00");
+
+        // Un "24" seguito da una lettera non è un orario.
+        let (testo, ore) = normalizza_ora_24("24abc");
+        assert_eq!(testo, "24abc");
+        assert_eq!(ore, 0.0);
+    }
+
+    /// Un «24» a metà stringa, non in testa né dopo spazio, è irrilevante.
+    #[test]
+    fn ventiquattro_in_posizione_non_oraria() {
+        let (testo, ore) = normalizza_ora_24("sensore 24: interno");
+        assert_eq!(testo, "sensore 24: interno");
+        assert_eq!(ore, 0.0);
     }
 }
