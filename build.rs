@@ -32,12 +32,19 @@ fn main() {
 
     // Percorsi con barra normale: rc.exe li accetta e non servono escape.
     let icona = ico.to_string_lossy().replace('\\', "/");
+    // La versione viene letta da Cargo.toml: scriverla a mano in quattro punti
+    // significherebbe rischiare che il VERSIONINFO di Windows resti indietro
+    // rispetto all'eseguibile ogni volta che si incrementa il numero.
+    let versione = env!("CARGO_PKG_VERSION");
+    // FILEVERSION e PRODUCTVERSION vogliono quattro numeri: il quarto (build)
+    // resta a zero.
+    let virc = format!("{},0", versione.replace('.', ","));
     let testo = format!(
         r#"1 ICON "{icona}"
 
 1 VERSIONINFO
-FILEVERSION 0,1,0,0
-PRODUCTVERSION 0,1,0,0
+FILEVERSION {virc}
+PRODUCTVERSION {virc}
 FILEFLAGSMASK 0x3fL
 FILEFLAGS 0x0L
 FILEOS 0x40004L
@@ -49,11 +56,11 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "Thermite - Mappatura Termica di Trasporto"
-            VALUE "FileVersion", "0.1.0"
+            VALUE "FileVersion", "{versione}"
             VALUE "InternalName", "thermite"
             VALUE "OriginalFilename", "thermite.exe"
             VALUE "ProductName", "Thermite"
-            VALUE "ProductVersion", "0.1.0"
+            VALUE "ProductVersion", "{versione}"
             VALUE "LegalCopyright", "GNU GENERAL PUBLIC LICENSE Version 3"
         END
     END
