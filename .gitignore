@@ -1,0 +1,12 @@
+# Compilati
+/target
+
+# Dati e preferenze locali (non fanno parte del codice sorgente)
+advanced_projects.db
+advanced_projects.db-*
+thermite_settings.txt
+
+# File estranei / duplicati lasciati nella cartella di lavoro
+Novo Documento de Texto.txt
+data/Novo Documento de Texto.txt
+src/views/chart - Copia.rs

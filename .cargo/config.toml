@@ -1,0 +1,9 @@
+# L'eseguibile di rilascio è collegato alle librerie statiche della CRT
+# (flag `+crt-static`): così `thermite.exe` non richiede le Microsoft Visual C++
+# Redistributable sulla macchina di destinazione.
+#
+# Vale solo per il target MSVC di Windows; le altre piattaforme sono invariate.
+# Rimuovere questo file per tornare al collegamento dinamico predefinito.
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
