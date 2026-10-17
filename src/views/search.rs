@@ -127,7 +127,12 @@ impl ViewState {
                                 i18n::t(lang, "Azioni"),
                             ] {
                                 header.col(|ui| {
-                                    ui.label(RichText::new(name).strong().size(11.5));
+                                    ui.label(
+                                        RichText::new(name)
+                                            .strong()
+                                            .size(11.5)
+                                            .color(theme::text_strong(dark)),
+                                    );
                                 });
                             }
                         })
