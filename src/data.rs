@@ -121,8 +121,8 @@ pub fn parse_number(value: &str) -> Option<f64> {
 /// restituisce la più frequente: così un file europeo separato da `;` con
 /// virgola decimale (`01/06/2026;08:00;18,5`) viene letto correttamente.
 ///
-/// A parità di conteggio vince la virgola, che è il separatore storico e quello
-/// usato da `data/test.csv`. Se la riga è vuota restituisce comunque la
+/// A parità di conteggio vince la virgola, che è il separatore storico
+/// dell'applicazione. Se la riga è vuota restituisce comunque la
 /// virgola, comportamento predefinito del crate `csv`.
 ///
 /// L'analisi è sulle sole righe di intestazione: una riga di dati non viene mai

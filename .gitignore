@@ -6,6 +6,10 @@ advanced_projects.db
 advanced_projects.db-*
 thermite_settings.txt
 
+# File di prova personale: l'archivio di esempio versionato è
+# data/dati_fasulli_17-10-2026.csv
+data/test.csv
+
 # File estranei / duplicati lasciati nella cartella di lavoro
 Novo Documento de Texto.txt
 data/Novo Documento de Texto.txt

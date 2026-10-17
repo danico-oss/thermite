@@ -43,7 +43,7 @@ dei sensori** e vengono usati per le etichette del grafico e per la mappa 3D,
 dove ogni sensore va posizionato sul container. Le due celle di intestazione
 delle colonne 1 e 2 vengono ignorate.
 
-Esempio con separatore virgola (`data/test.csv`):
+Esempio con separatore virgola:
 
 ```csv
 Data,Ora,Sensore_1,Sensore_2
