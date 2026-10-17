@@ -24,6 +24,73 @@ mappa 3D interattiva del container con i sensori posizionati sulle facce.
 - **Interfaccia**: tema chiaro/scuro, stile compatto per notebook, lingue
   italiano / inglese / portoghese.
 
+## Formato del file dati
+
+Il file (`.csv`, `.txt`, `.xlsx`, `.xls`) deve essere organizzato **una riga per
+campionamento**, con la **prima riga riservata alle intestazioni**:
+
+| Colonna | Contenuto | Note |
+| --- | --- | --- |
+| 1 | **Data** | vedi i formati ammessi sotto |
+| 2 | **Ora** | opzionale se la colonna 1 contiene già data e ora |
+| 3 | **Sensore 1** | valore numerico |
+| 4 | **Sensore 2** | valore numerico |
+| *n* | ***Sensore n-2*** | si continua all'infinito |
+
+Le colonne dalla terza in poi sono tutte serie di sensori: ce ne possono essere
+due come venti, senza limite. **I nomi delle colonne 3, 4, … diventano i nomi
+dei sensori** e vengono usati per le etichette del grafico e per la mappa 3D,
+dove ogni sensore va posizionato sul container. Le due celle di intestazione
+delle colonne 1 e 2 vengono ignorate.
+
+Esempio (`data/test.csv`):
+
+```csv
+Data,Ora,Sensore_1,Sensore_2
+2026-06-01,08:00:00,18.5,19.2
+2026-06-01,09:00:00,20.1,21.0
+2026-06-01,10:00:00,22.4,22.8
+```
+
+### Format di data e ora
+
+La prima e la seconda colonna vengono ricombinate in «data ora» e provate contro
+una lista di formati; il primo che corrisponde vince.
+
+Con data e ora separate in due colonne:
+
+| Esempio | Formato |
+| --- | --- |
+| `2026-06-01` + `08:00:00` | `%Y-%m-%d %H:%M:%S` |
+| `01/06/2026` + `08:00:00` | `%d/%m/%Y %H:%M:%S` |
+| `2026-06-01` + `08:00` | `%Y-%m-%d %H:%M` |
+| `01/06/2026` + `08:00` | `%d/%m/%Y %H:%M` |
+| `2026/06/01` + `08:00:00` | `%Y/%m/%d %H:%M:%S` |
+| `01-06-2026` + `08:00:00` | `%d-%m-%Y %H:%M:%S` |
+| `2026-06-01` + `08:00:00.500` | `%Y-%m-%d %H:%M:%S%.f` (frazionali) |
+| `01/06/2026` + `08:00:00.500` | `%d/%m/%Y %H:%M:%S%.f` (frazionali) |
+
+Con la sola colonna 1 (la 2 vuota), accetta anche la sola data, a patto che sia
+in uno di questi formati, e l'ora viene impostata a mezzanotte:
+
+`2026-06-01` · `01/06/2026` · `01-06-2026` · `2026/06/01`
+
+### Valori numerici
+
+- Sono accettati sia il punto che la **virgola decimale**: `18.5` e `18,5`
+  leggono lo stesso valore.
+- Le celle vuote o non numeriche vengono saltate per quel sensore, senza
+  bloccare le altre serie.
+- Le righe con data/ora non riconoscibili vengono ignorate del tutto.
+
+### Limiti da ricordare
+
+- **Il separatore di campo è la virgola `,`.** Un file con punto e virgola
+  (`01/06/2026;08:00;18,5`) non viene letto correttamente: va convertito.
+- La prima riga è sempre interpretata come intestazione, quindi non va omessa e
+  non deve contenere dati.
+- Per i file Excel viene usato il primo foglio.
+
 ## Compilazione
 
 Richiede [Rust](https://rustup.rs/) con toolchain MSVC su Windows (oppure

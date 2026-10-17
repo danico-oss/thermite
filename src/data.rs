@@ -165,3 +165,116 @@ pub fn format_timestamp(ts: f64) -> String {
         None => String::new(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Converte una riga di celle testuali in celle di testo.
+    fn riga(celle: &[&str]) -> Vec<String> {
+        celle.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Idem per l'intestazione (le prime due celle non diventano serie).
+    fn intestazione(celle: &[&str]) -> Vec<String> {
+        riga(celle)
+    }
+
+    /// Ogni formato elencato nel README deve essere effettivamente accettato:
+    /// se qui fallisce, la documentazione promette qualcosa che il codice non
+    /// fa, e va corretta.
+    #[test]
+    fn tutti_i_formati_documentati_nel_readme() {
+        let separati = [
+            ("2026-06-01", "08:00:00"), // %Y-%m-%d %H:%M:%S
+            ("01/06/2026", "08:00:00"), // %d/%m/%Y %H:%M:%S
+            ("2026-06-01", "08:00"),    // %Y-%m-%d %H:%M
+            ("01/06/2026", "08:00"),    // %d/%m/%Y %H:%M
+            ("2026/06/01", "08:00:00"), // %Y/%m/%d %H:%M:%S
+            ("01-06-2026", "08:00:00"), // %d-%m-%Y %H:%M:%S
+            ("2026-06-01", "08:00:00.500"),
+            ("01/06/2026", "08:00:00.500"),
+        ];
+        for (d, o) in separati {
+            assert!(
+                parse_timestamp(d, o).is_some(),
+                "formato documentato ma non riconosciuto: {d} + {o}"
+            );
+        }
+    }
+
+    /// Con la seconda colonna vuota, la prima deve accettare la sola data, con
+    /// l'ora posta a mezzanotte (come promesso nel README).
+    #[test]
+    fn sola_data_nella_prima_colonna() {
+        for d in ["2026-06-01", "01/06/2026", "01-06-2026", "2026/06/01"] {
+            let ts = parse_timestamp(d, "").expect("sola data non riconosciuta");
+            let dt = chrono::DateTime::from_timestamp(ts as i64, 0).unwrap();
+            assert_eq!(dt.format("%Y-%m-%d").to_string(), "2026-06-01", "data {d}");
+            assert_eq!(dt.format("%H:%M").to_string(), "00:00", "data {d}");
+        }
+    }
+
+    /// La prima colonna può contenere da sola data e ora unite.
+    #[test]
+    fn data_e_ora_in_una_sola_cella() {
+        let ts = parse_timestamp("2026-06-01 08:30:00", "").expect("data+ora non riconosciuta");
+        let dt = chrono::DateTime::from_timestamp(ts as i64, 0).unwrap();
+        assert_eq!(dt.format("%H:%M").to_string(), "08:30");
+    }
+
+    /// La virgola decimale è equipollente al punto, come documentato.
+    #[test]
+    fn virgola_decimale_equipollente() {
+        assert_eq!(parse_number("18.5"), Some(18.5));
+        assert_eq!(parse_number("18,5"), Some(18.5));
+        assert_eq!(parse_number("  21,0  "), Some(21.0));
+        assert_eq!(parse_number(""), None);
+        assert_eq!(parse_number("n/d"), None);
+    }
+
+    /// Una riga con data non riconoscibile viene saltata del tutto, mentre una
+    /// cella sensore vuota salta solo quel sensore.
+    #[test]
+    fn righe_e_celle_non_valide_vengono_saltate() {
+        let headers = intestazione(&["Data", "Ora", "S1", "S2"]);
+        let rows = vec![
+            riga(&["2026-06-01", "08:00", "18.5", "19.2"]),
+            riga(&["data nonsensica", "08:00", "99.9", "99.9"]),
+            riga(&["2026-06-01", "09:00", "", "21.0"]),
+        ];
+        let series = parse_series(&headers, &rows);
+
+        assert_eq!(series.len(), 2);
+        // La riga illeggibile non deve lasciare traccia in nessuna serie.
+        assert_eq!(series[0].points.len(), 1, "S1: la riga valida + la cella vuota");
+        assert_eq!(series[1].points.len(), 2, "S2: entrambe le righe valide");
+        assert_eq!(series[0].points[0][1], 18.5);
+        assert_eq!(series[1].points[1][1], 21.0);
+    }
+
+    /// Le prime due colonne non diventano serie: i sensori iniziano dalla terza.
+    #[test]
+    fn le_prime_due_colonne_non_serie_sensori() {
+        let headers = intestazione(&["Data", "Ora", "Sensore_1", "Sensore_2"]);
+        let rows = vec![riga(&["2026-06-01", "08:00", "18.5", "19.2"])];
+        let series = parse_series(&headers, &rows);
+
+        let nomi: Vec<&str> = series.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(nomi, vec!["Sensore_1", "Sensore_2"]);
+    }
+
+    /// Una serie con tutte le celle numeriche vuote non produce punti, ma le
+    /// altre serie restano intatte.
+    #[test]
+    fn serie_vuota_non_blocca_le_altre() {
+        let headers = intestazione(&["Data", "Ora", "S1", "S2"]);
+        let rows = vec![
+            riga(&["2026-06-01", "08:00", "", "19.2"]),
+            riga(&["2026-06-01", "09:00", "", "21.0"]),
+        ];
+        let series = parse_series(&headers, &rows);
+        assert!(series[0].points.is_empty());
+        assert_eq!(series[1].points.len(), 2);
+    }
+}
