@@ -508,8 +508,8 @@ static EN: &[(&str, &str)] = &[
     ),
     ("Rimuovi questo sensore", "Remove this sensor"),
     (
-        "Seleziona un sensore e clicca sul parallelepipedo. Trascina per ruotare, usa la rotella per lo zoom, clicca con il tasto destro su un punto per rimuoverlo.",
-        "Select a sensor and click on the box. Drag to rotate, use the wheel to zoom, right-click a point to remove it.",
+        "Seleziona un sensore e clicca sul parallelepipedo per posizionarlo. Trascina un punto per spostarlo, il fondo per ruotare, la rotella per lo zoom, il tasto destro su un punto per rimuoverlo.",
+        "Select a sensor and click on the box to place it. Drag a point to move it, drag the background to rotate, use the wheel to zoom, right-click a point to remove it.",
     ),
     (
         "Seleziona un sensore dall'elenco prima di cliccare.",
@@ -981,8 +981,8 @@ static PT: &[(&str, &str)] = &[
     ),
     ("Rimuovi questo sensore", "Remover este sensor"),
     (
-        "Seleziona un sensore e clicca sul parallelepipedo. Trascina per ruotare, usa la rotella per lo zoom, clicca con il tasto destro su un punto per rimuoverlo.",
-        "Selecione um sensor e clique no paralelepípedo. Arraste para girar, use a roda para o zoom, clique com o botão direito em um ponto para removê-lo.",
+        "Seleziona un sensore e clicca sul parallelepipedo per posizionarlo. Trascina un punto per spostarlo, il fondo per ruotare, la rotella per lo zoom, il tasto destro su un punto per rimuoverlo.",
+        "Selecione um sensor e clique no paralelepípedo para posicioná-lo. Arraste um ponto para movê-lo, o fundo para girar, a roda para o zoom, clique com o botão direito em um ponto para removê-lo.",
     ),
     (
         "Seleziona un sensore dall'elenco prima di cliccare.",

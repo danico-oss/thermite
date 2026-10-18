@@ -65,6 +65,9 @@ pub struct ViewState {
     pub map_zoom: f32,
     pub map_positions: Vec<SensorPos>,
     pub map_selected: Option<String>,
+    /// Sensore che si sta trascinando sul canvas (dispare quando il bottone
+    /// viene rilasciato). Finché è attivo il canvas non ruota la scena.
+    pub map_dragging: Option<String>,
     pub map_preview: Option<MapPreview>,
 }
 
@@ -100,6 +103,7 @@ impl ViewState {
             map_zoom: 1.0,
             map_positions: Vec::new(),
             map_selected: None,
+            map_dragging: None,
             map_preview: None,
         }
     }

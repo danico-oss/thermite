@@ -139,7 +139,7 @@ impl ViewState {
                         .body(|mut body| {
                             for p in &filtered {
                                 body.row(28.0, |mut row| {
-                                    row.set_selected(self.selected_edit_id == Some(p.id));
+                                    let selected = self.selected_edit_id == Some(p.id);
 
                                     row.col(|ui| {
                                         ui.label(
@@ -213,8 +213,26 @@ impl ViewState {
 
                                     // Un clic su una qualunque parte della riga
                                     // (fuori dai pulsanti) seleziona il progetto.
-                                    if row.response().clicked() {
+                                    let resp = row.response();
+                                    // Il doppio clic fa esattamente ciò che fa il
+                                    // pulsante "Apri dati" della stessa riga.
+                                    if resp.double_clicked() {
+                                        open_data = Some(p.clone());
+                                    }
+                                    if resp.clicked() {
                                         select_project = Some(p.clone());
+                                    }
+                                    // La selezione della riga è solo una cornice:
+                                    // `set_selected` di egui_extras, in alternativa,
+                                    // riempierebbe la riga con `selection.bg_fill`.
+                                    if selected {
+                                        let painter = resp.ctx.layer_painter(resp.layer_id);
+                                        theme::selection_frame(
+                                            &painter,
+                                            resp.rect,
+                                            egui::CornerRadius::same(3),
+                                            dark,
+                                        );
                                     }
                                 });
                             }
@@ -222,6 +240,23 @@ impl ViewState {
                 });
         });
 
+        // La selezione va gestita prima dell'apertura: con il doppio clic le due
+        // cose accadono nello stesso frame, e il messaggio di caricamento dei dati
+        // (o il suo errore) deve restare quello definitivo in barra di stato.
+        if let Some(p) = select_project {
+            // Selezione del progetto: la riga resta evidenziata e i relativi dati
+            // sono pronti per le operazioni (Gestione, apertura dati, ecc.).
+            self.select_project_for_operations(&p);
+            self.set_status(
+                format!(
+                    "{} {} (#{})",
+                    i18n::t(lang, "Progetto selezionato:"),
+                    p.name,
+                    p.id
+                ),
+                false,
+            );
+        }
         if let Some(p) = open_data {
             self.activate_project_and_load(p);
             self.current_tab = SelectedTab::DataGrid;
@@ -243,20 +278,6 @@ impl ViewState {
                     i18n::t(lang, "Progetto"),
                     p.id,
                     i18n::t(lang, "pronto per la modifica.")
-                ),
-                false,
-            );
-        }
-        if let Some(p) = select_project {
-            // Selezione del progetto: la riga resta evidenziata e i relativi dati
-            // sono pronti per le operazioni (Gestione, apertura dati, ecc.).
-            self.select_project_for_operations(&p);
-            self.set_status(
-                format!(
-                    "{} {} (#{})",
-                    i18n::t(lang, "Progetto selezionato:"),
-                    p.name,
-                    p.id
                 ),
                 false,
             );

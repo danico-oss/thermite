@@ -333,6 +333,28 @@ impl Database {
             .map_err(|e| e.to_string())
     }
 
+    /// Aggiorna la posizione di un sensore già inserito (esito di un
+    /// trascinamento sulla vista 3D). Restituisce `Err` se il sensore non
+    /// era presente: non è una creazione, quindi una riga mancante è un errore.
+    pub fn update_sensor_position(
+        &self,
+        project_id: i64,
+        pos: &SensorPos,
+    ) -> Result<(), String> {
+        let righe = self
+            .conn
+            .execute(
+                "UPDATE sensor_positions SET face = ?3, u = ?4, v = ?5
+                 WHERE project_id = ?1 AND sensor_name = ?2",
+                (project_id, &pos.name, pos.face as i64, pos.u, pos.v),
+            )
+            .map_err(|e| e.to_string())?;
+        if righe == 0 {
+            return Err(format!("posizione del sensore {} assente", pos.name));
+        }
+        Ok(())
+    }
+
     /// Elimina tutte le posizioni dei sensori di un progetto.
     pub fn delete_all_sensor_positions(&self, project_id: i64) -> Result<(), String> {
         self.conn

@@ -133,6 +133,8 @@ impl ViewState {
             self.map_dims = db.load_scene_dims(proj.id).unwrap_or_default().sanitized();
             self.map_positions = db.load_sensor_positions(proj.id);
             self.map_selected = None;
+            // Un eventuale trascinamento in corso apparteneva al progetto prima.
+            self.map_dragging = None;
             let cam = Camera::default();
             self.map_yaw = cam.yaw;
             self.map_pitch = cam.pitch;
@@ -152,7 +154,7 @@ impl ViewState {
         let mut yaw = self.map_yaw;
         let mut pitch = self.map_pitch;
         let mut zoom = self.map_zoom;
-        let positions = self.map_positions.clone();
+        let mut positions = self.map_positions.clone();
         let mut selected = self.map_selected.clone();
 
         let mut dims_changed = false;
@@ -161,6 +163,15 @@ impl ViewState {
         let mut clear_all = false;
         let mut reset_view = false;
         let mut open_preview = false;
+
+        // --- Trascinamento di un punto già posizionato ---
+        // Comincia premendo su un punto esistente e finisce col rilascio del
+        // bottone: finché `dragging` è imposto il canvas non ruota la scena.
+        let mut dragging: Option<String> = self.map_dragging.clone();
+        // Le nuove coordinate uscite dalle closure, da scrivere a fine frame.
+        let mut drag_moved: Option<(String, f32, f32)> = None;
+        // Nome del sensore rilasciato: in quel momento la posizione va salvata.
+        let mut drag_release: Option<String> = None;
 
         // --- Barra dei comandi ---
         theme::card(ui, |ui| {
@@ -301,16 +312,36 @@ impl ViewState {
                                 ),
                             );
                         } else {
-                            let list_h = (body_h - 320.0).max(120.0);
+                            // Il suggerimento sta sopra la lista perché la lista
+                            // deve poter occupare a ogni frame tutto lo spazio che
+                            // resta nella card: così la sua altezza si deduce
+                            // dall'ultima posizione raggiunta dal layout, senza
+                            // costanti magiche che, al ridursi della finestra,
+                            // finiscono per tagliarla fuori.
+                            theme::hint(
+                                ui,
+                                i18n::t(
+                                    lang,
+                                    "Seleziona un sensore e clicca sul parallelepipedo per posizionarlo. Trascina un punto per spostarlo, il fondo per ruotare, la rotella per lo zoom, il tasto destro su un punto per rimuoverlo.",
+                                ),
+                            );
+                            ui.add_space(4.0);
+
+                            // Tutto ciò che resta: se i sensori non ci stanno, la
+                            // barra di scorrimento compare e la lista scorre in
+                            // verticale; se ci stanno, riempie esattamente la card.
+                            let list_h = ui.available_height().max(96.0);
                             egui::ScrollArea::vertical()
                                 .max_height(list_h)
                                 .auto_shrink([false, false])
                                 .show(ui, |ui| {
                                     ui.set_width(ui.available_width());
                                     for (name, lo, hi) in &stats {
-                                        let is_placed = positions.iter().any(|p| &p.name == name);
+                                        let is_placed =
+                                            positions.iter().any(|p| &p.name == name);
                                         ui.horizontal(|ui| {
-                                            let is_sel = selected.as_deref() == Some(name.as_str());
+                                            let is_sel =
+                                                selected.as_deref() == Some(name.as_str());
                                             // Il nome mantiene il colore del testo (o verde se già
                                             // posizionato): la selezione è indicata solo da una
                                             // cornice, così il nome resta sempre leggibile.
@@ -325,11 +356,11 @@ impl ViewState {
                                             }
                                             let resp = ui.selectable_label(false, txt);
                                             if is_sel {
-                                                ui.painter().rect_stroke(
-                                                    resp.rect.expand(2.0),
-                                                    CornerRadius::same(3),
-                                                    Stroke::new(1.4_f32, theme::accent(dark)),
-                                                    StrokeKind::Inside,
+                                                theme::selection_frame(
+                                                    ui.painter(),
+                                                    resp.rect,
+                                                    egui::CornerRadius::same(3),
+                                                    dark,
                                                 );
                                             }
                                             if resp.clicked() {
@@ -368,15 +399,6 @@ impl ViewState {
                                     }
                                 });
                         }
-
-                        ui.add_space(4.0);
-                        theme::hint(
-                            ui,
-                            i18n::t(
-                                lang,
-                                "Seleziona un sensore e clicca sul parallelepipedo. Trascina per ruotare, usa la rotella per lo zoom, clicca con il tasto destro su un punto per rimuoverlo.",
-                            ),
-                        );
                     });
                 },
             );
@@ -392,6 +414,57 @@ impl ViewState {
                     let (rect, response) =
                         ui.allocate_exact_size(Vec2::new(w, body_h), egui::Sense::click_and_drag());
 
+                    let cam = Camera { yaw, pitch, zoom };
+                    let proj = scene3d::Projector::new(
+                        rect.center().x,
+                        rect.center().y,
+                        rect.width().min(rect.height()),
+                        &cam,
+                        dims,
+                    );
+
+                    // --- Trascinamento di un punto già posizionato ---
+                    // Si aggancia solo se, quando il trascinamento comincia, il
+                    // cursore è ancora entro l'area del punto (14 px): così si
+                    // afferra il punto che si ha sotto le dita, mentre la scena
+                    // comincia a ruotare soltanto premendo a vuoto.
+                    if response.drag_started() {
+                        if let Some(pos) = response.interact_pointer_pos() {
+                            if let Some(name) =
+                                nearest_marker(pos, rect, dims, yaw, pitch, zoom, &positions)
+                            {
+                                dragging = Some(name);
+                            }
+                        }
+                    }
+
+                    if let Some(name) = dragging.clone() {
+                        // Il raggio del cursore colpisce la faccia che il punto
+                        // occupa già: le nuove coordinate arrivano esattamente dove
+                        // si punta, il punto resta su quella faccia e non ne
+                        // cambia mai, quindi non "scivola" verso o lontano dalla
+                        // telecamera se non per la pendenza della parete.
+                        if let Some(p) = positions.iter_mut().find(|p| p.name == name) {
+                            if let Some(ptr) = response.interact_pointer_pos() {
+                                if let Some((u, v)) = proj.drag_on_face(p.face, ptr.x, ptr.y, dims)
+                                {
+                                    p.u = u;
+                                    p.v = v;
+                                    drag_moved = Some((name.clone(), u, v));
+                                }
+                            }
+                        }
+                        if response.drag_stopped() {
+                            drag_release = Some(name);
+                            dragging = None;
+                        }
+                    } else if response.dragged() {
+                        // Rotazione: trascinamento con il tasto sinistro.
+                        let d = response.drag_delta();
+                        yaw += d.x * 0.01;
+                        pitch = (pitch + d.y * 0.01).clamp(-1.45, 1.45);
+                    }
+
                     let style = screen_style(dark);
                     draw_scene(
                         ui.painter(),
@@ -405,31 +478,22 @@ impl ViewState {
                         &style,
                     );
 
-                    // Rotazione: trascinamento con il tasto sinistro.
-                    if response.dragged() {
-                        let d = response.drag_delta();
-                        yaw += d.x * 0.01;
-                        pitch = (pitch + d.y * 0.01).clamp(-1.45, 1.45);
-                    }
                     // Zoom con la rotella.
                     if response.hovered() {
                         let scroll = ui.input(|i| i.smooth_scroll_delta.y);
                         if scroll.abs() > 0.0 {
                             zoom = (zoom * (1.0 + scroll * 0.0015)).clamp(0.35, 3.5);
                         }
-                        ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+                        ui.ctx().set_cursor_icon(if dragging.is_some() {
+                            egui::CursorIcon::Grabbing
+                        } else {
+                            egui::CursorIcon::Grab
+                        });
                     }
-                    // Posizionamento: clic su una faccia.
-                    if response.clicked() {
+                    // Posizionamento: clic su una faccia. Mentre un punto è in
+                    // mano il clic non posiziona nulla.
+                    if response.clicked() && dragging.is_none() {
                         if let Some(pos) = response.interact_pointer_pos() {
-                            let cam = Camera { yaw, pitch, zoom };
-                            let proj = scene3d::Projector::new(
-                                rect.center().x,
-                                rect.center().y,
-                                rect.width().min(rect.height()),
-                                &cam,
-                                dims,
-                            );
                             let (o, d) = proj.unproject(pos.x, pos.y);
                             if let Some((face, u, v)) = scene3d::pick_face(o, d, dims) {
                                 place = Some((face, u, v));
@@ -456,6 +520,28 @@ impl ViewState {
         self.map_pitch = pitch;
         self.map_zoom = zoom;
         self.map_selected = selected;
+        // Il trascinamento continua da un frame all'altro finché non si
+        // rilascia il bottone.
+        self.map_dragging = dragging;
+
+        // Posizione aggiornata durante il trascinamento: prima la si scrive nella
+        // lista, così il frame successivo riparte da qui.
+        if let Some((name, u, v)) = drag_moved {
+            if let Some(p) = self.map_positions.iter_mut().find(|p| p.name == name) {
+                p.u = u;
+                p.v = v;
+            }
+        }
+        // Rilascio: la posizione finale passa anche al database, altrimenti
+        // sarebbe persa alla chiusura.
+        if let Some(name) = drag_release {
+            if let Some(p) = self.map_positions.iter().find(|p| p.name == name) {
+                let pos = p.clone();
+                if let Err(e) = db.update_sensor_position(proj.id, &pos) {
+                    self.set_status(format!("{} {e}", i18n::t(lang, "Errore SQLite:")), true);
+                }
+            }
+        }
 
         if dims_changed {
             if let Err(e) = db.save_scene_dims(proj.id, self.map_dims) {

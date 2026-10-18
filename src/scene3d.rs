@@ -81,6 +81,16 @@ pub fn face_normal(face: usize) -> Vec3 {
     }
 }
 
+/// Distanza dell'origine dal piano che contiene la faccia `face`
+/// (l'equazione del piano è `normale · p = offset`).
+fn face_plane_offset(face: usize, dims: SceneDims) -> f32 {
+    match face {
+        0 | 1 => dims.w * 0.5,
+        2 | 3 => dims.h * 0.5,
+        _ => dims.d * 0.5,
+    }
+}
+
 /// Punto locale sulla faccia `face` per coordinate `u`, `v` in `[0, 1]`.
 pub fn face_point(face: usize, u: f32, v: f32, dims: SceneDims) -> Vec3 {
     let (hx, hy, hz) = (dims.w * 0.5, dims.h * 0.5, dims.d * 0.5);
@@ -170,6 +180,42 @@ impl Projector {
         self.dist - self.rotate(p).z
     }
 
+    /// Coordinate `(u, v)` sulla faccia `face` del punto in cui il raggio di
+    /// schermo `(sx, sy)` attraversa il piano di quella faccia.
+    ///
+    /// È l'operazione che serve a **trascinare** un sensore posizionato: il
+    /// punto finisce sempre esattamente sotto il cursore e resta sulla *propria*
+    /// faccia, senza mai saltare su un'altra — così, mentre si trascina, il
+    /// sensore scorre sulla parete su cui giace e non si avvicina né si allontana
+    /// dalla telecamera per un errore di faccia; la profondità segue soltanto la
+    /// pendenza naturale della parete.
+    ///
+    /// Le coordinate sono limitate a `[0, 1]`: spingendo oltre il bordo il
+    /// sensore si ferma sull'orlo del container invece di uscirne.
+    ///
+    /// Restituisce `None` quando il raggio non incontra la faccia (piano
+    /// parallelo alla linea di vista, o intersezione dietro la telecamera): in
+    /// quel caso chi trascina conserva le coordinate precedenti.
+    pub fn drag_on_face(
+        &self,
+        face: usize,
+        sx: f32,
+        sy: f32,
+        dims: SceneDims,
+    ) -> Option<(f32, f32)> {
+        let (origin, dir) = self.unproject(sx, sy);
+        let nrm = face_normal(face);
+        let denom = nrm.dot(dir);
+        if denom.abs() < 1e-9 {
+            return None;
+        }
+        let t = (face_plane_offset(face, dims) - nrm.dot(origin)) / denom;
+        if t <= 1e-4 {
+            return None;
+        }
+        Some(face_uv(face, origin.add(dir.scale(t)), dims))
+    }
+
     /// Ricostruisce il raggio (origine, direzione) in coordinate locali a partire
     /// da un punto di schermo.
     pub fn unproject(&self, sx: f32, sy: f32) -> (Vec3, Vec3) {
@@ -233,11 +279,7 @@ pub fn pick_face(origin: Vec3, dir: Vec3, dims: SceneDims) -> Option<(usize, f32
 
     for face in 0..FACE_COUNT {
         let nrm = face_normal(face);
-        let offset = match face {
-            0 | 1 => h.x,
-            2 | 3 => h.y,
-            _ => h.z,
-        };
+        let offset = face_plane_offset(face, dims);
         let denom = nrm.dot(dir);
         if denom.abs() < 1e-9 {
             continue;
@@ -327,5 +369,64 @@ mod tests {
         assert_eq!(face, 4);
         assert!((u - 0.4).abs() < 1e-3, "u = {u}");
         assert!((v - 0.7).abs() < 1e-3, "v = {v}");
+    }
+
+    /// Il trascinamento è l'inversa esatta della proiezione sulla faccia che il
+    /// sensore già occupa: il punto arriva dove sta il cursore e non salta mai
+    /// su un'altra faccia.
+    #[test]
+    fn trascinamento_segue_il_cursore_sulla_propria_faccia() {
+        let d = dims();
+        let mut spostamenti_verificati = 0usize;
+
+        for (yaw, pitch) in [(0.0f32, 0.0f32), (0.65, 0.42), (1.2, 0.7), (0.65, -0.42)] {
+            let cam = Camera { yaw, pitch, zoom: 1.0 };
+            let proj = Projector::new(400.0, 300.0, 400.0, &cam, d);
+
+            for face in 0..FACE_COUNT {
+                // Andata e ritorno: proietto un punto interno della faccia e lo
+                // ricalcolo trascinandolo esattamente su quella proiezione.
+                for (u0, v0) in [(0.4_f32, 0.7_f32), (0.6, 0.3)] {
+                    let (sx, sy) = proj.project(face_point(face, u0, v0, d));
+                    let (u, v) = proj.drag_on_face(face, sx, sy, d).unwrap_or_else(|| {
+                        panic!("yaw={yaw} pitch={pitch} faccia={face}: nessuna intersezione")
+                    });
+                    assert!(
+                        (u - u0).abs() < 1e-2 && (v - v0).abs() < 1e-2,
+                        "yaw={yaw} pitch={pitch} faccia={face}: ottenuto ({u:.4}, {v:.4}), \
+                         atteso ({u0}, {v0})"
+                    );
+                }
+
+                // Piccoli spostamenti: il punto deve cadere dove sta il cursore.
+                // Il controllo ha senso solo finché il risultato resta dentro la
+                // faccia; oltre il bordo la coordinata viene limitata e il
+                // sensore si ferma sull'orlo, che è il comportamento voluto.
+                let (sx0, sy0) = proj.project(face_point(face, 0.5, 0.5, d));
+                for (dx, dy) in [(20.0_f32, 0.0), (0.0, 20.0), (-20.0, -20.0)] {
+                    let (sx, sy) = (sx0 + dx, sy0 + dy);
+                    let (u, v) = proj
+                        .drag_on_face(face, sx, sy, d)
+                        .expect("il raggio deve intersecare la faccia");
+                    let dentro = u > 1e-3 && u < 1.0 - 1e-3 && v > 1e-3 && v < 1.0 - 1e-3;
+                    if !dentro {
+                        continue;
+                    }
+                    spostamenti_verificati += 1;
+                    let (ax, ay) = proj.project(face_point(face, u, v, d));
+                    let scarto = ((ax - sx).powi(2) + (ay - sy).powi(2)).sqrt();
+                    assert!(
+                        scarto < 0.5,
+                        "yaw={yaw} pitch={pitch} faccia={face} delta=({dx}, {dy}): \
+                         il punto cade a {scarto:.2}px dal cursore"
+                    );
+                }
+            }
+        }
+
+        assert!(
+            spostamenti_verificati >= 12,
+            "solo {spostamenti_verificati} spostamenti interni alla faccia verificati"
+        );
     }
 }

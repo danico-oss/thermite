@@ -5,7 +5,7 @@ use crate::i18n::{self, Language};
 use crate::models::{Command, SelectedTab};
 use crate::theme::{self, Icon};
 use crate::views::ViewState;
-use eframe::egui::{self, Align2, Color32, CornerRadius, FontId, Rect, RichText, Vec2};
+use eframe::egui::{self, Align2, Color32, CornerRadius, FontId, RichText, Vec2};
 
 /// Disegna barra dei menu + nastro delle schede + gruppi di comandi.
 ///
@@ -172,9 +172,12 @@ fn ribbon_tab(
         ui.allocate_exact_size(Vec2::new(text_w + 24.0, 22.0), egui::Sense::click());
     let painter = ui.painter();
 
-    let bg = if active {
-        a.gamma_multiply(0.10)
-    } else if resp.hovered() {
+    // La scheda attiva è individuata **solo** dalla cornice: nessun riempimento
+    // né sottolineatura, come ogni altra selezione del programma. L'evidenziazione
+    // del puntatore sopra la scheda resta, ma è un riscontro transitorio e non
+    // l'indicatore di selezione — per questo non viene disegnato sulla scheda
+    // attiva, che deve apparire come una cornice e basta.
+    let bg = if !active && resp.hovered() {
         theme::hover_bg(dark)
     } else {
         Color32::TRANSPARENT
@@ -183,14 +186,7 @@ fn ribbon_tab(
         painter.rect_filled(rect, CornerRadius::same(5), bg);
     }
     if active {
-        painter.rect_filled(
-            Rect::from_min_max(
-                egui::pos2(rect.left() + 6.0, rect.bottom() - 2.0),
-                egui::pos2(rect.right() - 6.0, rect.bottom()),
-            ),
-            CornerRadius::same(1),
-            a,
-        );
+        theme::selection_frame(painter, rect, CornerRadius::same(5), dark);
     }
     painter.text(
         rect.center(),

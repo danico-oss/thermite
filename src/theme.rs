@@ -520,10 +520,11 @@ pub fn pill_button(
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 20.0), egui::Sense::click());
     let painter = ui.painter();
 
+    // La selezione (linguette di Configurazioni, pulsanti attivi del grafico)
+    // è **solo** una cornice: nessun riempimento, altrimenti il testo andrebbe
+    // forzato in bianco sul tema chiaro e smarrebbe il proprio colore.
     let bg = if resp.is_pointer_button_down_on() {
         a.gamma_multiply(0.35)
-    } else if active {
-        a.gamma_multiply(0.85)
     } else if resp.hovered() {
         hover_bg(dark)
     } else {
@@ -536,7 +537,7 @@ pub fn pill_button(
         rect,
         CornerRadius::same(4),
         Stroke::new(
-            1.0_f32,
+            1.4_f32,
             if active {
                 a
             } else {
@@ -547,7 +548,7 @@ pub fn pill_button(
     );
 
     let fg = if active {
-        Color32::WHITE
+        a
     } else if resp.hovered() {
         a
     } else {
@@ -610,6 +611,25 @@ pub fn section_title(ui: &mut egui::Ui, title: &str) {
 pub fn hint(ui: &mut egui::Ui, text: &str) {
     let dark = ui.visuals().dark_mode;
     ui.label(RichText::new(text).size(10.5).color(muted(dark)));
+}
+
+/// Cornice di selezione: è l'**unico** modo in cui il programma indica una
+/// selezione (riga dell'elenco progetti, voce della lista sensori, linguetta
+/// di scheda attiva, pulsante attivo). La selezione è sempre e solo un
+/// contorno, mai un riempimento: così il testo sottostante mantiene il proprio
+/// colore e resta leggibile, e tutte le schede si riconoscono allo stesso modo.
+pub fn selection_frame(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    corner: egui::CornerRadius,
+    dark: bool,
+) {
+    painter.rect_stroke(
+        rect.expand(2.0),
+        corner,
+        Stroke::new(1.4_f32, accent(dark)),
+        egui::StrokeKind::Inside,
+    );
 }
 
 /// Riquadro messaggio (successo / errore) stile "banner".
