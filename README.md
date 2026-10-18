@@ -168,9 +168,19 @@ normally, without just the version resource.
 cargo run --release
 ```
 
-The data is saved in `advanced_projects.db` (SQLite) and the preferences in
-`thermite_settings.txt`, both in the working directory. Neither of them should
-be versioned.
+The projects are saved in `advanced_projects.db` (SQLite) and the preferences
+in `thermite_settings.txt`. Neither of them should be versioned.
+
+When the database is missing it is created automatically, in the first folder
+that can be written, searched in this order:
+
+1. the working directory, but only if `advanced_projects.db` is already there
+   (the behaviour of the previous versions);
+2. the folder of the executable;
+3. `%LOCALAPPDATA%\Thermite`.
+
+The preferences file keeps being read from and written to the working
+directory.
 
 ## Structure
 

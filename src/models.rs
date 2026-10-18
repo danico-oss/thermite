@@ -1,6 +1,7 @@
 use crate::i18n::{self, Language};
 use crate::scene3d::Vec3;
 use rusqlite::Connection;
+use std::path::PathBuf;
 
 #[derive(Clone)]
 pub struct Project {
@@ -147,16 +148,96 @@ pub struct Database {
     pub conn: Connection,
 }
 
+/// Name of the database file.
+const NOME_DATABASE: &str = "advanced_projects.db";
+
 impl Database {
+    /// Opens the database, creating it when it does not exist yet.
+    ///
+    /// The file is searched in three places and is created in the first one
+    /// that can be written:
+    ///
+    /// 1. the current working directory, but only when the file is already
+    ///    there: it is where the previous versions wrote it, so the projects
+    ///    saved before this change keep being found;
+    /// 2. the folder of the executable: a fresh copy of the app always keeps
+    ///    its data in the same, predictable place, whatever the working
+    ///    directory happens to be;
+    /// 3. `%LOCALAPPDATA%\Thermite`, for an executable left in a folder that
+    ///    cannot be written (e.g. under Program Files).
+    ///
+    /// The bare working directory is only the last resort.
     pub fn new() -> Self {
-        Self::open_at("advanced_projects.db")
+        let locale = PathBuf::from(NOME_DATABASE);
+        let locale_esistente = locale.exists();
+        let cartella_eseguibile = std::env::current_exe()
+            .ok()
+            .and_then(|eseguibile| eseguibile.parent().map(|cartella| cartella.to_path_buf()));
+        let cartella_appdata = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+
+        let candidati =
+            Self::candidati_database(locale, locale_esistente, cartella_eseguibile, cartella_appdata);
+
+        let mut motivi = Vec::new();
+        for percorso in candidati {
+            if let Some(cartella) = percorso.parent() {
+                // The application data folder may not exist yet: it is created
+                // before the attempt, while the other folders are already there.
+                let _ = std::fs::create_dir_all(cartella);
+            }
+            match Connection::open(&percorso) {
+                Ok(conn) => {
+                    Self::prepara_schema(&conn);
+                    return Self { conn };
+                }
+                Err(e) => motivi.push(format!("{} ({e})", percorso.display())),
+            }
+        }
+        panic!(
+            "Impossibile creare o aprire il database SQLite in nessuna delle cartelle previste: {}",
+            motivi.join("; ")
+        );
+    }
+
+    /// Ordered list of the candidate paths for the database.
+    ///
+    /// It is a pure function, without any access to the file system, so the
+    /// order can be checked by a test without touching real data.
+    fn candidati_database(
+        locale: PathBuf,
+        locale_esistente: bool,
+        cartella_eseguibile: Option<PathBuf>,
+        cartella_appdata: Option<PathBuf>,
+    ) -> Vec<PathBuf> {
+        let mut lista = Vec::new();
+        if locale_esistente {
+            lista.push(locale.clone());
+        }
+        if let Some(cartella) = cartella_eseguibile {
+            lista.push(cartella.join(NOME_DATABASE));
+        }
+        if let Some(base) = cartella_appdata {
+            lista.push(base.join("Thermite").join(NOME_DATABASE));
+        }
+        lista.push(locale);
+        lista
     }
 
     /// Opens (or creates) the database at the given path.
+    ///
+    /// Used by the tests, which need to open a database outside the folders of
+    /// the application; the app itself goes through [`Database::new`].
+    #[cfg(test)]
     pub fn open_at(percorso: &str) -> Self {
         let conn = Connection::open(percorso)
             .expect("Impossibile aprire il database SQLite");
+        Self::prepara_schema(&conn);
+        Self { conn }
+    }
 
+    /// Creates the tables on an already open connection and applies the
+    /// migrations of the previous versions.
+    fn prepara_schema(conn: &Connection) {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -252,8 +333,6 @@ impl Database {
                     .expect("Impossibile aggiungere la colonna di posizione");
             }
         }
-
-        Self { conn }
     }
 
     pub fn load_all_projects(&self) -> Vec<Project> {
@@ -459,6 +538,44 @@ mod tests {
         let p = std::path::Path::new(&dir).join(nome);
         let _ = std::fs::remove_file(&p);
         p.to_string_lossy().into_owned()
+    }
+
+    /// A fresh copy of the app (no database in the working directory) creates
+    /// the database next to the executable, and not in whatever folder it
+    /// happens to be started from; the user's application data folder follows,
+    /// while the working directory is only the last resort.
+    #[test]
+    fn database_nuovo_si_crea_accanto_all_eseguibile() {
+        let lista = Database::candidati_database(
+            PathBuf::from("advanced_projects.db"),
+            false,
+            Some(PathBuf::from("C:/app")),
+            Some(PathBuf::from("C:/utenti/x/AppData/Local")),
+        );
+
+        assert_eq!(lista[0], PathBuf::from("C:/app/advanced_projects.db"));
+        assert_eq!(
+            lista[1],
+            PathBuf::from("C:/utenti/x/AppData/Local/Thermite/advanced_projects.db")
+        );
+        assert_eq!(lista.last(), Some(&PathBuf::from("advanced_projects.db")));
+    }
+
+    /// A database already present in the working directory (the place used by
+    /// the previous versions) keeps being the first candidate, so the projects
+    /// saved before this change are not lost.
+    #[test]
+    fn database_gia_nella_cartella_di_lavoro_resto_il_primo() {
+        let lista = Database::candidati_database(
+            PathBuf::from("advanced_projects.db"),
+            true,
+            Some(PathBuf::from("C:/app")),
+            None,
+        );
+
+        assert_eq!(lista[0], PathBuf::from("advanced_projects.db"));
+        assert_eq!(lista[1], PathBuf::from("C:/app/advanced_projects.db"));
+        assert_eq!(lista.len(), 3);
     }
 
     /// A database created by the previous version (without `data_crc32`) is
