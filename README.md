@@ -21,8 +21,13 @@ mappa 3D interattiva del container con i sensori posizionati sulle facce.
 - **Mappa 3D**: parallelepipedo ruotabile che rappresenta il container, con i
   sensori posizionati sulle facce secondo i dati del progetto. Container
   semitrasparente, selezione dei sensori, anteprima ed export PDF. Un sensore
-  già posizionato si trascina sulla propria faccia, senza cambiarla mai, e la
-  posizione nuova viene salvata sul database al rilascio del bottone.
+  già posizionato si trascina **liberamente nello spazio**: il punto segue il
+  cursore mantenendo la distanza dalla telecamera e, guardando il container da
+  tre quarti, si sposta con componenti su tutti e tre gli assi x, y e z anziché
+  sui soli due della parete, quindi può anche staccarsi dal container. La
+  posizione nuova viene salvata sul database al rilascio del bottone; per
+  rimettere un sensore su una parete basta rimuoverlo (tasto destro sul punto)
+  e riposizionarlo col clic.
 - **Integrità dei dati**: al salvataggio del progetto viene calcolato il CRC32
   del file dati; al caricamento il codice viene riverificato e un file
   modificato viene rifiutato.

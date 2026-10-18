@@ -853,12 +853,14 @@ mod tests {
                 face: 4,
                 u: 0.25,
                 v: 0.5,
+                pos: None,
             },
             SensorPos {
                 name: "Sensore 2".to_string(),
                 face: 2,
                 u: 0.7,
                 v: 0.3,
+                pos: None,
             },
         ];
         let stats = vec![

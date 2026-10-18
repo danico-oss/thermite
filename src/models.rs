@@ -1,4 +1,5 @@
 use crate::i18n::{self, Language};
+use crate::scene3d::Vec3;
 use rusqlite::Connection;
 
 #[derive(Clone)]
@@ -46,16 +47,30 @@ impl SceneDims {
     }
 }
 
-/// Posizione di un sensore su una faccia del parallelepipedo.
+/// Posizione di un sensore sul (o vicino al) parallelepipedo.
 ///
 /// `face` è l'indice della faccia (0..5); `u`, `v` sono coordinate normalizzate
-/// `[0, 1]` sulla faccia.
+/// `[0, 1]` sulla faccia: insieme descrivono il punto **sulla parete** su cui il
+/// sensore è stato posizionato col clic.
+///
+/// `pos` ha la precedenza quando è presente ed è la posizione effettiva in
+/// coordinate **normalizzate**, cioè frazioni della mezza dimensione del
+/// container (`x / (larghezza/2)`, ecc.). Viene valorizzata appena il sensore
+/// viene trascinato; da quel momento in poi il punto non giace più
+/// necessariamente su nessuna parete. Normalizzarla fa sì che un sensore
+/// trascinato segua il container quando ne cambiano le dimensioni, proprio come
+/// quelli rimasti sulla parete.
+///
+/// `Vec3` è definito nel modulo di geometria: dipenderne da qui (anziché
+/// conservare una tupla) evita conversioni in ogni punto in cui la posizione
+/// viene disegnata o proiettata.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SensorPos {
     pub name: String,
     pub face: usize,
     pub u: f32,
     pub v: f32,
+    pub pos: Option<Vec3>,
 }
 
 /// Le schede della barra multifunzione (una per vista).
@@ -191,6 +206,11 @@ impl Database {
         // Posizione dei sensori sul parallelepipedo. La chiave primaria composta
         // (project_id, sensor_name) impedisce di posizionare due volte lo stesso
         // sensore dello stesso progetto.
+        //
+        // `face`, `u`, `v` descrivono il punto sulla parete su cui il sensore è
+        // stato posizionato; `pos_x`, `pos_y`, `pos_z` (facoltative) sono la
+        // posizione effettiva normalizzata, scritta quando il sensore viene
+        // trascinato e può quindi staccarsi dalla parete.
         conn.execute(
             "CREATE TABLE IF NOT EXISTS sensor_positions (
                 project_id INTEGER NOT NULL,
@@ -198,11 +218,40 @@ impl Database {
                 face INTEGER NOT NULL,
                 u REAL NOT NULL,
                 v REAL NOT NULL,
+                pos_x REAL,
+                pos_y REAL,
+                pos_z REAL,
                 PRIMARY KEY (project_id, sensor_name)
             )",
             [],
         )
         .expect("Errore creazione tabella sensor_positions");
+
+        // Migrazione: aggiunge le colonne della posizione effettiva ai
+        // database creati da una versione precedente. Come per `data_crc32`
+        // si interroga lo schema invece di ignorare l'errore, così un errore
+        // vero non viene silenziosamente nascosto.
+        let colonne_sensori = conn
+            .prepare("PRAGMA table_info(sensor_positions)")
+            .and_then(|mut stmt| {
+                let righe = stmt.query_map([], |r| r.get::<_, String>(1))?; // nome colonna
+                let mut nomi = Vec::new();
+                for nome in righe {
+                    nomi.push(nome?);
+                }
+                Ok(nomi)
+            })
+            .expect("Impossibile leggere lo schema della tabella sensor_positions");
+        for (colonna, ddl) in [
+            ("pos_x", "ALTER TABLE sensor_positions ADD COLUMN pos_x REAL"),
+            ("pos_y", "ALTER TABLE sensor_positions ADD COLUMN pos_y REAL"),
+            ("pos_z", "ALTER TABLE sensor_positions ADD COLUMN pos_z REAL"),
+        ] {
+            if !colonne_sensori.iter().any(|c| c == colonna) {
+                conn.execute(ddl, [])
+                    .expect("Impossibile aggiungere la colonna di posizione");
+            }
+        }
 
         Self { conn }
     }
@@ -281,7 +330,7 @@ impl Database {
     pub fn load_sensor_positions(&self, project_id: i64) -> Vec<SensorPos> {
         let mut out = Vec::new();
         let mut stmt = match self.conn.prepare(
-            "SELECT sensor_name, face, u, v FROM sensor_positions
+            "SELECT sensor_name, face, u, v, pos_x, pos_y, pos_z FROM sensor_positions
              WHERE project_id = ?1 ORDER BY sensor_name ASC",
         ) {
             Ok(s) => s,
@@ -294,6 +343,7 @@ impl Database {
                 face: row.get::<_, i64>(1)? as usize,
                 u: row.get(2)?,
                 v: row.get(3)?,
+                pos: leggi_posizione(row.get(4)?, row.get(5)?, row.get(6)?),
             })
         });
 
@@ -314,9 +364,19 @@ impl Database {
     ) -> Result<(), String> {
         self.conn
             .execute(
-                "INSERT INTO sensor_positions (project_id, sensor_name, face, u, v)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                (project_id, &pos.name, pos.face as i64, pos.u, pos.v),
+                "INSERT INTO sensor_positions
+                 (project_id, sensor_name, face, u, v, pos_x, pos_y, pos_z)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                (
+                    project_id,
+                    &pos.name,
+                    pos.face as i64,
+                    pos.u,
+                    pos.v,
+                    pos.pos.map(|p| p.x),
+                    pos.pos.map(|p| p.y),
+                    pos.pos.map(|p| p.z),
+                ),
             )
             .map(|_| ())
             .map_err(|e| e.to_string())
@@ -344,9 +404,19 @@ impl Database {
         let righe = self
             .conn
             .execute(
-                "UPDATE sensor_positions SET face = ?3, u = ?4, v = ?5
+                "UPDATE sensor_positions
+                 SET face = ?3, u = ?4, v = ?5, pos_x = ?6, pos_y = ?7, pos_z = ?8
                  WHERE project_id = ?1 AND sensor_name = ?2",
-                (project_id, &pos.name, pos.face as i64, pos.u, pos.v),
+                (
+                    project_id,
+                    &pos.name,
+                    pos.face as i64,
+                    pos.u,
+                    pos.v,
+                    pos.pos.map(|p| p.x),
+                    pos.pos.map(|p| p.y),
+                    pos.pos.map(|p| p.z),
+                ),
             )
             .map_err(|e| e.to_string())?;
         if righe == 0 {
@@ -364,6 +434,18 @@ impl Database {
             )
             .map(|_| ())
             .map_err(|e| e.to_string())
+    }
+}
+
+/// Ricostruisce la posizione effettiva dalle tre colonne del database.
+///
+/// Se anche solo una delle tre manca (riga scritta da una versione precedente,
+/// che non le aveva) la posizione è assente: il sensore resta allora incollato
+/// alla parete `face` alle coordinate `u`, `v`.
+fn leggi_posizione(x: Option<f32>, y: Option<f32>, z: Option<f32>) -> Option<Vec3> {
+    match (x, y, z) {
+        (Some(x), Some(y), Some(z)) => Some(Vec3::new(x, y, z)),
+        _ => None,
     }
 }
 
@@ -443,6 +525,119 @@ mod tests {
 
         let progetti = db.load_all_projects();
         assert_eq!(progetti[0].data_crc32.as_deref(), Some("CBF43926"));
+
+        let _ = std::fs::remove_file(&percorso);
+    }
+
+    /// Una posizione effettiva (scritta quando il sensore viene trascinato) viene
+    /// salvata e riletta identica; il punto su cui era stato posizionato resta
+    /// conservato in `face`, `u`, `v`.
+    #[test]
+    fn la_posizione_trascinata_passa_attraverso_il_database() {
+        let percorso = db_temporaneo("thermite_posizione_libera_prova.db");
+        let db = Database::open_at(&percorso);
+
+        // Sensore ancora incollato alla parete: nessuna posizione effettiva.
+        let sulla_parete = SensorPos {
+            name: "S1".to_string(),
+            face: 4,
+            u: 0.5,
+            v: 0.25,
+            pos: None,
+        };
+        db.insert_sensor_position(1, &sulla_parete).unwrap();
+        assert_eq!(
+            db.load_sensor_positions(1),
+            vec![sulla_parete.clone()],
+            "un sensore appena posizionato non ha posizione effettiva"
+        );
+
+        // Trascinato: la posizione effettiva ha la precedenza e viene riletta
+        // tale e quale, con face, u, v intatti.
+        let trascinato = SensorPos {
+            pos: Some(Vec3::new(1.75, -0.5, 0.2)),
+            ..sulla_parete.clone()
+        };
+        db.update_sensor_position(1, &trascinato).unwrap();
+        assert_eq!(
+            db.load_sensor_positions(1),
+            vec![trascinato.clone()],
+            "la posizione trascinata deve tornare identica"
+        );
+
+        // Spostare ancora il sensore riscrive la posizione, non la somma.
+        let spostato = SensorPos {
+            pos: Some(Vec3::new(-2.0, 0.0, 1.0)),
+            ..trascinato.clone()
+        };
+        db.update_sensor_position(1, &spostato).unwrap();
+        assert_eq!(db.load_sensor_positions(1), vec![spostato]);
+
+        // Un sensore mai trascinato resta descritto dalla sola parete.
+        let altro = SensorPos {
+            name: "S2".to_string(),
+            face: 1,
+            u: 0.1,
+            v: 0.9,
+            pos: None,
+        };
+        db.insert_sensor_position(1, &altro).unwrap();
+        let caricate = db.load_sensor_positions(1);
+        assert_eq!(caricate.len(), 2);
+        assert_eq!(caricate[1], altro);
+
+        let _ = std::fs::remove_file(&percorso);
+    }
+
+    /// Un database creato prima che i sensori potessero essere trascinati non ha
+    /// le colonne di posizione effettiva: l'apertura le aggiunge e le righe
+    /// vecchie si leggono come sensori rimasti sulla parete.
+    #[test]
+    fn migra_la_tabella_sensori_del_database_vecchio() {
+        let percorso = db_temporaneo("thermite_migrazione_sensori_prova.db");
+
+        // Schema vecchio, esattamente quello delle versioni precedenti.
+        {
+            let conn = Connection::open(&percorso).unwrap();
+            conn.execute(
+                "CREATE TABLE sensor_positions (
+                    project_id INTEGER NOT NULL,
+                    sensor_name TEXT NOT NULL,
+                    face INTEGER NOT NULL,
+                    u REAL NOT NULL,
+                    v REAL NOT NULL,
+                    PRIMARY KEY (project_id, sensor_name)
+                )",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO sensor_positions (project_id, sensor_name, face, u, v)
+                 VALUES (1, 'S1', 4, 0.5, 0.25)",
+                [],
+            )
+            .unwrap();
+        }
+
+        // L'apertura con la versione nuova deve migrare lo schema.
+        let db = Database::open_at(&percorso);
+        let caricate = db.load_sensor_positions(1);
+        assert_eq!(caricate.len(), 1, "la riga vecchia deve sopravvivere");
+        assert_eq!(caricate[0].name, "S1");
+        assert_eq!(
+            caricate[0].pos, None,
+            "una riga senza posizione è un sensore ancora sulla parete"
+        );
+
+        // Una seconda apertura (ALTER già applicato) deve poter aggiornare la
+        // riga, cioè scrivere sulle colonne appena aggiunte.
+        let db2 = Database::open_at(&percorso);
+        let spostato = SensorPos {
+            pos: Some(Vec3::new(1.0, 1.0, 1.0)),
+            ..caricate[0].clone()
+        };
+        db2.update_sensor_position(1, &spostato).unwrap();
+        assert_eq!(db2.load_sensor_positions(1), vec![spostato]);
 
         let _ = std::fs::remove_file(&percorso);
     }

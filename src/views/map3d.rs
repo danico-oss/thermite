@@ -169,7 +169,7 @@ impl ViewState {
         // bottone: finché `dragging` è imposto il canvas non ruota la scena.
         let mut dragging: Option<String> = self.map_dragging.clone();
         // Le nuove coordinate uscite dalle closure, da scrivere a fine frame.
-        let mut drag_moved: Option<(String, f32, f32)> = None;
+        let mut drag_moved: Option<(String, scene3d::Vec3)> = None;
         // Nome del sensore rilasciato: in quel momento la posizione va salvata.
         let mut drag_release: Option<String> = None;
 
@@ -439,19 +439,18 @@ impl ViewState {
                     }
 
                     if let Some(name) = dragging.clone() {
-                        // Il raggio del cursore colpisce la faccia che il punto
-                        // occupa già: le nuove coordinate arrivano esattamente dove
-                        // si punta, il punto resta su quella faccia e non ne
-                        // cambia mai, quindi non "scivola" verso o lontano dalla
-                        // telecamera se non per la pendenza della parete.
+                        // Il punto scorre nel piano parallelo alla visuale che
+                        // passa per lui: arriva esattamente dove si punta e,
+                        // se la telecamera guarda da tre quarti, si sposta con
+                        // componenti su x, y e z insieme. Non viene riportato su
+                        // nessuna parete, quindi può staccarsi dal container.
                         if let Some(p) = positions.iter_mut().find(|p| p.name == name) {
                             if let Some(ptr) = response.interact_pointer_pos() {
-                                if let Some((u, v)) = proj.drag_on_face(p.face, ptr.x, ptr.y, dims)
-                                {
-                                    p.u = u;
-                                    p.v = v;
-                                    drag_moved = Some((name.clone(), u, v));
-                                }
+                                let punto = scene3d::sensor_point(p, dims);
+                                let normalizzato =
+                                    scene3d::normalize_point(proj.drag_at_depth(punto, ptr.x, ptr.y), dims);
+                                p.pos = Some(normalizzato);
+                                drag_moved = Some((name.clone(), normalizzato));
                             }
                         }
                         if response.drag_stopped() {
@@ -526,10 +525,9 @@ impl ViewState {
 
         // Posizione aggiornata durante il trascinamento: prima la si scrive nella
         // lista, così il frame successivo riparte da qui.
-        if let Some((name, u, v)) = drag_moved {
+        if let Some((name, pos)) = drag_moved {
             if let Some(p) = self.map_positions.iter_mut().find(|p| p.name == name) {
-                p.u = u;
-                p.v = v;
+                p.pos = Some(pos);
             }
         }
         // Rilascio: la posizione finale passa anche al database, altrimenti
@@ -567,6 +565,9 @@ impl ViewState {
                             face,
                             u,
                             v,
+                            // Ancora incollato alla parete: nessuna posizione
+                            // effettiva finché non viene trascinato.
+                            pos: None,
                         };
                         match db.insert_sensor_position(proj.id, &pos) {
                             Ok(()) => {
