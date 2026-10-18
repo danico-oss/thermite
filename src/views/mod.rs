@@ -21,12 +21,12 @@ pub use preview::PdfPreview;
 pub struct ViewState {
     pub current_tab: SelectedTab,
 
-    // --- Preferenze ---
+    // --- Preferences ---
     pub lang: Language,
     pub dark_mode: bool,
     pub show_settings: bool,
 
-    // --- Pagina 1: Gestione ---
+    // --- Page 1: Management ---
     pub selected_edit_id: Option<i64>,
     pub name_input: String,
     pub container_input: String,
@@ -35,29 +35,29 @@ pub struct ViewState {
     pub file_path_input: String,
     pub feedback_msg: Option<(String, bool)>,
 
-    // --- Pagina 2: Ricerca ---
+    // --- Page 2: Search ---
     pub search_query: String,
 
-    // --- Pagina 3 & 4: Dati e Grafico ---
+    // --- Page 3 & 4: Data and Chart ---
     pub active_project: Option<Project>,
     pub csv_headers: Vec<String>,
     pub csv_rows: Vec<Vec<String>>,
     pub csv_load_error: Option<String>,
 
-    // --- Opzioni di visualizzazione del grafico ---
+    // --- Chart display options ---
     pub show_points: bool,
     pub show_legend: bool,
     pub reset_zoom_requested: bool,
 
-    // --- Stato globale ---
+    // --- Global state ---
     pub status: Option<(String, bool)>,
     pub show_about: bool,
 
-    // --- Anteprima PDF ---
+    // --- PDF preview ---
     pub pdf_preview: Option<PdfPreview>,
 
-    // --- Pagina 5: Mappa 3D dei sensori ---
-    /// Progetto per cui layout e posizioni sono già stati caricati dal database.
+    // --- Page 5: 3D sensor map ---
+    /// Project for which the layout and positions have already been loaded from the database.
     pub map_loaded_for: Option<i64>,
     pub map_dims: SceneDims,
     pub map_yaw: f32,
@@ -65,12 +65,12 @@ pub struct ViewState {
     pub map_zoom: f32,
     pub map_positions: Vec<SensorPos>,
     pub map_selected: Option<String>,
-    /// Sensore che si sta trascinando sul canvas (dispare quando il bottone
-    /// viene rilasciato). Finché è attivo il canvas non ruota la scena.
+    /// Sensor currently being dragged on the canvas (it vanishes when the
+    /// button is released). While active, the canvas does not rotate the scene.
     pub map_dragging: Option<String>,
-    /// Sensori posizionati attualmente nascosti sul diagramma, per nome.
-    /// Solo sessione: non viene salvato da nessuna parte e si azzera quando
-    /// si passa a un altro progetto.
+    /// Currently placed sensors hidden on the diagram, by name.
+    /// Session-only: it is not saved anywhere and is reset when switching to
+    /// another project.
     pub map_hidden: std::collections::BTreeSet<String>,
     pub map_preview: Option<MapPreview>,
 }
@@ -113,7 +113,7 @@ impl ViewState {
         }
     }
 
-    /// Imposta il messaggio mostrato nella barra di stato.
+    /// Sets the message shown in the status bar.
     pub fn set_status(&mut self, msg: impl Into<String>, is_error: bool) {
         self.status = Some((msg.into(), is_error));
     }
@@ -143,7 +143,7 @@ impl ViewState {
         self.load_data_file();
     }
 
-    /// Apre la finestra di scelta del file dati e aggiorna il campo del form.
+    /// Opens the data file chooser dialog and updates the form field.
     pub fn pick_data_file(&mut self) {
         if let Some(path) = rfd::FileDialog::new()
             .set_title(i18n::t(self.lang, "Seleziona il file dati dei sensori (CSV o Excel)"))
@@ -156,7 +156,7 @@ impl ViewState {
         }
     }
 
-    /// Carica i dati sia da file CSV/TXT che da file Excel (.xlsx / .xls)
+    /// Loads the data from either CSV/TXT files or Excel files (.xlsx / .xls)
     pub fn load_data_file(&mut self) {
         self.csv_headers.clear();
         self.csv_rows.clear();
@@ -185,10 +185,10 @@ impl ViewState {
             return;
         }
 
-        // Verifica di integrità: il CRC32 del file deve corrispondere a quello
-        // salvato nel progetto. Se il progetto non ha un CRC registrato (creato
-        // prima di questa funzionalità, o con file non leggibile al salvataggio)
-        // la verifica viene saltata.
+        // Integrity check: the file's CRC32 must match the one saved in the
+        // project. If the project has no recorded CRC (created before this
+        // feature, or with a file that was unreadable when saving) the check is
+        // skipped.
         if let Some(atteso) = &proj.data_crc32 {
             match crate::crc32::file(path) {
                 Some(calcolato) => {
@@ -245,12 +245,12 @@ impl ViewState {
                 if let Ok(range) = excel.worksheet_range(sheet_name) {
                     let mut rows_iter = range.rows();
 
-                    // Legge la prima riga come intestazione
+                    // Reads the first row as the header
                     if let Some(header_row) = rows_iter.next() {
                         self.csv_headers = header_row.iter().map(cell_to_string).collect();
                     }
 
-                    // Legge le righe successive
+                    // Reads the following rows
                     for row in rows_iter {
                         let row_vals: Vec<String> = row.iter().map(cell_to_string).collect();
                         self.csv_rows.push(row_vals);
@@ -270,8 +270,8 @@ impl ViewState {
                 }
             };
 
-            // Rileva il separatore (`,` o `;`) dalla sola prima riga, poi
-            // riporta il cursore all'inizio per far leggere tutto al reader.
+            // Detect the separator (`,` or `;`) from the first line only, then
+            // rewind the cursor to the start so the reader reads everything.
             let separatore = {
                 let mut prima_riga = String::new();
                 let _ = BufReader::new(&mut file).read_line(&mut prima_riga);
@@ -315,7 +315,7 @@ mod tests {
     use super::*;
     use crate::models::Project;
 
-    /// Progetto di prova che punta a un file temporaneo.
+    /// Test project that points to a temporary file.
     fn progetto(percorso: &str, crc: Option<&str>) -> Project {
         Project {
             id: 1,
@@ -328,7 +328,7 @@ mod tests {
         }
     }
 
-    /// Scrive un CSV temporaneo e ne restituisce il percorso.
+    /// Writes a temporary CSV and returns its path.
     fn csv_temporaneo(nome: &str, contenuto: &[u8]) -> String {
         let dir = std::env::var("TEMP").unwrap_or_else(|_| ".".to_string());
         let p = std::path::Path::new(&dir).join(nome);
@@ -336,7 +336,7 @@ mod tests {
         p.to_string_lossy().into_owned()
     }
 
-    /// Con il CRC giusto i dati vengono caricati.
+    /// With the right CRC the data is loaded.
     #[test]
     fn crc_corretto_carica_i_dati() {
         let contenuto = b"Data,Ora,S1,S2\n2024-01-01,10:00,21.5,22.0\n2024-01-01,11:00,20.5,21.0\n";
@@ -354,7 +354,7 @@ mod tests {
         let _ = std::fs::remove_file(&percorso);
     }
 
-    /// Se il file cambia dopo il salvataggio, il caricamento viene bloccato.
+    /// If the file changes after saving, loading is blocked.
     #[test]
     fn crc_diverso_blocca_il_caricamento() {
         let originale = b"Data,Ora,S1\n2024-01-01,10:00,21.5\n";
@@ -367,7 +367,7 @@ mod tests {
         vs.load_data_file();
         assert_eq!(vs.csv_load_error, None, "prima: {:?}", vs.csv_load_error);
 
-        // Il file viene sostituito con contenuto diverso.
+        // The file is replaced with different content.
         let nuovo = b"Data,Ora,S1\n2024-01-01,10:00,99.9\n";
         std::fs::write(&percorso, nuovo).unwrap();
         vs.load_data_file();
@@ -377,21 +377,21 @@ mod tests {
             err.contains("CRC"),
             "il messaggio deve parlare di CRC: {err}"
         );
-        // Nessun dato vecchio o nuovo deve essere stato caricato.
+        // No old or new data must have been loaded.
         assert!(vs.csv_headers.is_empty());
         assert!(vs.csv_rows.is_empty());
         let _ = std::fs::remove_file(&percorso);
     }
 
-    /// L'archivio di dati fasulli consegnato con il progetto deve caricarsi
-    /// per intero: 25 registrazioni orarie, 4 sensori, valori tutti fra 2 e 8.
+    /// The dummy data archive shipped with the project must load in full:
+    /// 25 hourly records, 4 sensors, all values between 2 and 8.
     ///
-    /// Verifica anche l'ora limite `24:00:00` (mezzanotte di fine giornata,
-    /// valida in ISO 8601): se il parser la rifiutasse, l'ultima riga
-    /// sparirebbe in silenzio da grafico e mappa 3D.
+    /// It also checks the boundary time `24:00:00` (the midnight ending the
+    /// day, valid in ISO 8601): if the parser rejected it, the last row would
+    /// silently disappear from the chart and the 3D map.
     #[test]
     fn archivio_dati_fasulli_si_carica_per_intero() {
-        let percorso = "data/dati_fasulli_17-10-2026.csv";
+        let percorso = "data/example_data.csv";
         assert!(
             std::path::Path::new(percorso).exists(),
             "manca l'archivio di prova: {percorso}"
@@ -428,8 +428,8 @@ mod tests {
             }
         }
 
-        // La riga 24:00:00 è la mezzanotte di fine giornata: deve cadere 24 ore
-        // dopo la prima, non sovrapporsi ad essa.
+        // The 24:00:00 row is the midnight ending the day: it must fall 24 hours
+        // after the first one, not overlap with it.
         let prima = series[0].points.first().expect("serie vuota");
         let ultima = series[0].points.last().expect("serie vuota");
         assert_eq!(
@@ -448,8 +448,8 @@ mod tests {
         );
     }
 
-    /// Un file separato da `;` con virgola decimale viene letto correttamente:
-    /// il separatore è rilevato dalla prima riga, e i valori restano numerici.
+    /// A file separated by `;` with a decimal comma is read correctly: the
+    /// separator is detected from the first line, and the values stay numeric.
     #[test]
     fn file_con_separatore_punto_e_virgola() {
         let contenuto = "Data;Ora;Sensore_1;Sensore_2\n2024-01-01;10:00;21,5;22,0\n2024-01-01;11:00;20,5;21,0\n";
@@ -465,7 +465,7 @@ mod tests {
         assert_eq!(vs.csv_rows.len(), 2);
         assert_eq!(vs.csv_rows[0], vec!["2024-01-01", "10:00", "21,5", "22,0"]);
 
-        // La virgola decimale deve produrre numeri veri, non celle spezzate.
+        // The decimal comma must produce real numbers, not split cells.
         let series = crate::data::parse_series(&vs.csv_headers, &vs.csv_rows);
         assert_eq!(series.len(), 2);
         assert_eq!(series[0].name, "Sensore_1");
@@ -476,7 +476,7 @@ mod tests {
         let _ = std::fs::remove_file(&percorso);
     }
 
-    /// Un progetto senza CRC registrato continua a caricare (compatibilità).
+    /// A project without a recorded CRC still loads (backward compatibility).
     #[test]
     fn senza_crc_registrato_carica_comunque() {
         let contenuto = b"Data,Ora,S1\n2024-01-01,10:00,21.5\n";
@@ -492,7 +492,7 @@ mod tests {
         let _ = std::fs::remove_file(&percorso);
     }
 
-    /// Salva il progetto: il CRC del file finisce nel database.
+    /// Saves the project: the file's CRC ends up in the database.
     #[test]
     fn salvataggio_scrive_il_crc_nel_database() {
         let contenuto = b"Data,Ora,S1\n2024-01-01,10:00,21.5\n";
@@ -518,7 +518,7 @@ mod tests {
         let atteso = crate::crc32::file_hex(&percorso).expect("CRC calcolabile");
         assert_eq!(progetti[0].data_crc32.as_deref(), Some(atteso.as_str()));
 
-        // Il progetto riletto dal database carica i dati senza errori.
+        // The project re-read from the database loads the data without errors.
         let mut vs2 = ViewState::new();
         vs2.lang = crate::i18n::Language::It;
         vs2.active_project = Some(progetti[0].clone());

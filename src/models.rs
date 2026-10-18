@@ -13,7 +13,7 @@ pub struct Project {
     pub data_crc32: Option<String>,
 }
 
-/// Dimensioni del parallelepipedo che rappresenta il container (in metri).
+/// Dimensions of the parallelepiped that represents the container (in meters).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SceneDims {
     pub w: f32,
@@ -32,12 +32,12 @@ impl Default for SceneDims {
 }
 
 impl SceneDims {
-    /// Metà diagonale, usata per inquadrare l'oggetto e per i controlli.
+    /// Half diagonal, used to frame the object and for the controls.
     pub fn half_diagonal(self) -> f32 {
         (self.w * self.w + self.h * self.h + self.d * self.d).sqrt() * 0.5
     }
 
-    /// Vincola le dimensioni a un intervallo ragionevole.
+    /// Constrains the dimensions to a reasonable range.
     pub fn sanitized(self) -> Self {
         Self {
             w: self.w.clamp(0.5, 60.0),
@@ -47,23 +47,23 @@ impl SceneDims {
     }
 }
 
-/// Posizione di un sensore sul (o vicino al) parallelepipedo.
+/// Position of a sensor on (or near) the parallelepiped.
 ///
-/// `face` è l'indice della faccia (0..5); `u`, `v` sono coordinate normalizzate
-/// `[0, 1]` sulla faccia: insieme descrivono il punto **sulla parete** su cui il
-/// sensore è stato posizionato col clic.
+/// `face` is the face index (0..5); `u`, `v` are normalized coordinates
+/// `[0, 1]` on the face: together they describe the point **on the wall** where
+/// the sensor was placed with the click.
 ///
-/// `pos` ha la precedenza quando è presente ed è la posizione effettiva in
-/// coordinate **normalizzate**, cioè frazioni della mezza dimensione del
-/// container (`x / (larghezza/2)`, ecc.). Viene valorizzata appena il sensore
-/// viene trascinato; da quel momento in poi il punto non giace più
-/// necessariamente su nessuna parete. Normalizzarla fa sì che un sensore
-/// trascinato segua il container quando ne cambiano le dimensioni, proprio come
-/// quelli rimasti sulla parete.
+/// `pos` takes precedence when present and is the actual position in
+/// **normalized** coordinates, that is, fractions of the half dimension of
+/// the container (`x / (width/2)`, etc.). It is set as soon as the
+/// sensor is dragged; from that moment on, the point no longer necessarily
+/// lies on any wall. Normalizing it makes a dragged sensor follow the
+/// container when its dimensions change, exactly like the ones that stayed
+/// on the wall.
 ///
-/// `Vec3` è definito nel modulo di geometria: dipenderne da qui (anziché
-/// conservare una tupla) evita conversioni in ogni punto in cui la posizione
-/// viene disegnata o proiettata.
+/// `Vec3` is defined in the geometry module: depending on it from here
+/// (rather than keeping a tuple) avoids conversions at every point where the
+/// position is drawn or projected.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SensorPos {
     pub name: String,
@@ -73,7 +73,7 @@ pub struct SensorPos {
     pub pos: Option<Vec3>,
 }
 
-/// Le schede della barra multifunzione (una per vista).
+/// The ribbon tabs (one per view).
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SelectedTab {
     Management,
@@ -97,7 +97,7 @@ impl SelectedTab {
         )
     }
 
-    /// Descrizione breve mostrata nella barra di stato.
+    /// Short description shown in the status bar.
     pub fn description(&self, lang: Language) -> &'static str {
         i18n::t(
             lang,
@@ -120,7 +120,7 @@ impl SelectedTab {
     ];
 }
 
-/// Comandi emessi dal menu e dalla barra multifunzione.
+/// Commands emitted by the menu and the ribbon.
 #[derive(Clone, PartialEq)]
 pub enum Command {
     NewProject,
@@ -152,7 +152,7 @@ impl Database {
         Self::open_at("advanced_projects.db")
     }
 
-    /// Apre (o crea) il database al percorso indicato.
+    /// Opens (or creates) the database at the given path.
     pub fn open_at(percorso: &str) -> Self {
         let conn = Connection::open(percorso)
             .expect("Impossibile aprire il database SQLite");
@@ -170,14 +170,14 @@ impl Database {
         )
         .expect("Errore creazione tabella projects");
 
-        // Migrazione: aggiunge la colonna per il CRC32 del file dati, se il
-        // database è stato creato da una versione precedente. Si interroga lo
-        // schema invece di ignorare l'errore, così un errore vero (es. database
-        // in sola lettura) non viene silenziosamente nascosto.
+        // Migration: adds the column for the CRC32 of the data file, if the
+        // database was created by a previous version. The schema is queried
+        // instead of ignoring the error, so that a real error (e.g. a read-only
+        // database) is not silently hidden.
         let ha_crc32 = conn
             .prepare("PRAGMA table_info(projects)")
             .and_then(|mut stmt| {
-                let righe = stmt.query_map([], |r| r.get::<_, String>(1))?; // nome colonna
+                let righe = stmt.query_map([], |r| r.get::<_, String>(1))?; // column name
                 for nome in righe {
                     if nome? == "data_crc32" {
                         return Ok(true);
@@ -191,7 +191,7 @@ impl Database {
                 .expect("Impossibile aggiungere la colonna data_crc32");
         }
 
-        // Dimensioni del parallelepipedo usato nella mappa 3D (una per progetto).
+        // Dimensions of the parallelepiped used in the 3D map (one per project).
         conn.execute(
             "CREATE TABLE IF NOT EXISTS sensor_layouts (
                 project_id INTEGER PRIMARY KEY,
@@ -203,14 +203,14 @@ impl Database {
         )
         .expect("Errore creazione tabella sensor_layouts");
 
-        // Posizione dei sensori sul parallelepipedo. La chiave primaria composta
-        // (project_id, sensor_name) impedisce di posizionare due volte lo stesso
-        // sensore dello stesso progetto.
+        // Sensor positions on the parallelepiped. The composite primary key
+        // (project_id, sensor_name) prevents placing the same sensor of the
+        // same project twice.
         //
-        // `face`, `u`, `v` descrivono il punto sulla parete su cui il sensore è
-        // stato posizionato; `pos_x`, `pos_y`, `pos_z` (facoltative) sono la
-        // posizione effettiva normalizzata, scritta quando il sensore viene
-        // trascinato e può quindi staccarsi dalla parete.
+        // `face`, `u`, `v` describe the point on the wall at which the sensor
+        // was placed; `pos_x`, `pos_y`, `pos_z` (optional) are the normalized
+        // actual position, written when the sensor is dragged and can therefore
+        // detach from the wall.
         conn.execute(
             "CREATE TABLE IF NOT EXISTS sensor_positions (
                 project_id INTEGER NOT NULL,
@@ -227,14 +227,14 @@ impl Database {
         )
         .expect("Errore creazione tabella sensor_positions");
 
-        // Migrazione: aggiunge le colonne della posizione effettiva ai
-        // database creati da una versione precedente. Come per `data_crc32`
-        // si interroga lo schema invece di ignorare l'errore, così un errore
-        // vero non viene silenziosamente nascosto.
+        // Migration: adds the actual-position columns to databases created by
+        // a previous version. As with `data_crc32`, the schema is queried
+        // instead of ignoring the error, so that a real error is not silently
+        // hidden.
         let colonne_sensori = conn
             .prepare("PRAGMA table_info(sensor_positions)")
             .and_then(|mut stmt| {
-                let righe = stmt.query_map([], |r| r.get::<_, String>(1))?; // nome colonna
+                let righe = stmt.query_map([], |r| r.get::<_, String>(1))?; // column name
                 let mut nomi = Vec::new();
                 for nome in righe {
                     nomi.push(nome?);
@@ -286,10 +286,10 @@ impl Database {
     }
 
     // -----------------------------------------------------------------------
-    // Mappa 3D: dimensioni del container
+    // 3D map: container dimensions
     // -----------------------------------------------------------------------
 
-    /// Legge le dimensioni salvate del parallelepipedo per un progetto.
+    /// Reads the saved dimensions of the parallelepiped for a project.
     pub fn load_scene_dims(&self, project_id: i64) -> Option<SceneDims> {
         self.conn
             .query_row(
@@ -306,7 +306,7 @@ impl Database {
             .ok()
     }
 
-    /// Salva (crea o aggiorna) le dimensioni del parallelepipedo per un progetto.
+    /// Saves (creates or updates) the dimensions of the parallelepiped for a project.
     pub fn save_scene_dims(&self, project_id: i64, dims: SceneDims) -> Result<(), String> {
         self.conn
             .execute(
@@ -323,10 +323,10 @@ impl Database {
     }
 
     // -----------------------------------------------------------------------
-    // Mappa 3D: posizione dei sensori
+    // 3D map: sensor positions
     // -----------------------------------------------------------------------
 
-    /// Carica le posizioni dei sensori salvate per un progetto.
+    /// Loads the sensor positions saved for a project.
     pub fn load_sensor_positions(&self, project_id: i64) -> Vec<SensorPos> {
         let mut out = Vec::new();
         let mut stmt = match self.conn.prepare(
@@ -355,8 +355,8 @@ impl Database {
         out
     }
 
-    /// Inserisce la posizione di un sensore. Restituisce `Err` se il sensore è
-    /// già presente per lo stesso progetto (vincolo di unicità del database).
+    /// Inserts the position of a sensor. Returns `Err` if the sensor is
+    /// already present for the same project (database uniqueness constraint).
     pub fn insert_sensor_position(
         &self,
         project_id: i64,
@@ -382,7 +382,7 @@ impl Database {
             .map_err(|e| e.to_string())
     }
 
-    /// Elimina la posizione di un sensore.
+    /// Deletes the position of a sensor.
     pub fn delete_sensor_position(&self, project_id: i64, name: &str) -> Result<(), String> {
         self.conn
             .execute(
@@ -393,9 +393,9 @@ impl Database {
             .map_err(|e| e.to_string())
     }
 
-    /// Aggiorna la posizione di un sensore già inserito (esito di un
-    /// trascinamento sulla vista 3D). Restituisce `Err` se il sensore non
-    /// era presente: non è una creazione, quindi una riga mancante è un errore.
+    /// Updates the position of an already inserted sensor (the outcome of a
+    /// drag on the 3D view). Returns `Err` if the sensor was not present:
+    /// this is not a creation, so a missing row is an error.
     pub fn update_sensor_position(
         &self,
         project_id: i64,
@@ -425,7 +425,7 @@ impl Database {
         Ok(())
     }
 
-    /// Elimina tutte le posizioni dei sensori di un progetto.
+    /// Deletes all the sensor positions of a project.
     pub fn delete_all_sensor_positions(&self, project_id: i64) -> Result<(), String> {
         self.conn
             .execute(
@@ -437,11 +437,11 @@ impl Database {
     }
 }
 
-/// Ricostruisce la posizione effettiva dalle tre colonne del database.
+/// Reconstructs the actual position from the three database columns.
 ///
-/// Se anche solo una delle tre manca (riga scritta da una versione precedente,
-/// che non le aveva) la posizione è assente: il sensore resta allora incollato
-/// alla parete `face` alle coordinate `u`, `v`.
+/// If even only one of the three is missing (a row written by a previous
+/// version, which did not have them) the position is absent: the sensor then
+/// stays glued to the `face` wall at the `u`, `v` coordinates.
 fn leggi_posizione(x: Option<f32>, y: Option<f32>, z: Option<f32>) -> Option<Vec3> {
     match (x, y, z) {
         (Some(x), Some(y), Some(z)) => Some(Vec3::new(x, y, z)),
@@ -453,7 +453,7 @@ fn leggi_posizione(x: Option<f32>, y: Option<f32>, z: Option<f32>) -> Option<Vec
 mod tests {
     use super::*;
 
-    /// Percorso temporaneo unico per un database di prova.
+    /// Unique temporary path for a test database.
     fn db_temporaneo(nome: &str) -> String {
         let dir = std::env::var("TEMP").unwrap_or_else(|_| ".".to_string());
         let p = std::path::Path::new(&dir).join(nome);
@@ -461,14 +461,14 @@ mod tests {
         p.to_string_lossy().into_owned()
     }
 
-    /// Un database creato dalla versione precedente (senza `data_crc32`) viene
-    /// migrato: la colonna viene aggiunta e le righe vecchie restano leggibili
-    /// con CRC assente, quindi la verifica al caricamento viene saltata.
+    /// A database created by the previous version (without `data_crc32`) is
+    /// migrated: the column is added and the old rows remain readable with a
+    /// missing CRC, so the check at load time is skipped.
     #[test]
     fn migra_un_database_della_vecchia_versione() {
         let percorso = db_temporaneo("thermite_migrazione_prova.db");
 
-        // Schema vecchio, esattamente quello delle versioni precedenti.
+        // Old schema, exactly the one of the previous versions.
         {
             let conn = Connection::open(&percorso).unwrap();
             conn.execute(
@@ -491,7 +491,7 @@ mod tests {
             .unwrap();
         }
 
-        // L'apertura con la versione nuova deve migrare lo schema.
+        // Opening with the new version must migrate the schema.
         let db = Database::open_at(&percorso);
         let progetti = db.load_all_projects();
         assert_eq!(progetti.len(), 1, "la riga vecchia deve sopravvivere");
@@ -501,15 +501,15 @@ mod tests {
             "le righe vecchie non hanno CRC: la verifica viene saltata"
         );
 
-        // Riaprire non deve fallire né duplicare la colonna (ALTER già applicato).
+        // Reopening must not fail nor duplicate the column (ALTER already applied).
         let db2 = Database::open_at(&percorso);
         assert_eq!(db2.load_all_projects().len(), 1);
 
         let _ = std::fs::remove_file(&percorso);
     }
 
-    /// Su un database nuovo la colonna è presente e il CRC scritto al
-    /// salvataggio viene riletto correttamente.
+    /// On a new database the column is present and the CRC written at
+    /// save time is read back correctly.
     #[test]
     fn database_nuovo_ha_la_colonna_crc() {
         let percorso = db_temporaneo("thermite_nuovo_prova.db");
@@ -529,15 +529,15 @@ mod tests {
         let _ = std::fs::remove_file(&percorso);
     }
 
-    /// Una posizione effettiva (scritta quando il sensore viene trascinato) viene
-    /// salvata e riletta identica; il punto su cui era stato posizionato resta
-    /// conservato in `face`, `u`, `v`.
+    /// An actual position (written when the sensor is dragged) is saved and
+    /// read back identical; the point at which it had been placed remains
+    /// preserved in `face`, `u`, `v`.
     #[test]
     fn la_posizione_trascinata_passa_attraverso_il_database() {
         let percorso = db_temporaneo("thermite_posizione_libera_prova.db");
         let db = Database::open_at(&percorso);
 
-        // Sensore ancora incollato alla parete: nessuna posizione effettiva.
+        // Sensor still glued to the wall: no actual position.
         let sulla_parete = SensorPos {
             name: "S1".to_string(),
             face: 4,
@@ -552,8 +552,8 @@ mod tests {
             "un sensore appena posizionato non ha posizione effettiva"
         );
 
-        // Trascinato: la posizione effettiva ha la precedenza e viene riletta
-        // tale e quale, con face, u, v intatti.
+        // Dragged: the actual position takes precedence and is read back
+        // exactly as it is, with face, u, v intact.
         let trascinato = SensorPos {
             pos: Some(Vec3::new(1.75, -0.5, 0.2)),
             ..sulla_parete.clone()
@@ -565,7 +565,7 @@ mod tests {
             "la posizione trascinata deve tornare identica"
         );
 
-        // Spostare ancora il sensore riscrive la posizione, non la somma.
+        // Moving the sensor again rewrites the position, it does not accumulate.
         let spostato = SensorPos {
             pos: Some(Vec3::new(-2.0, 0.0, 1.0)),
             ..trascinato.clone()
@@ -573,7 +573,7 @@ mod tests {
         db.update_sensor_position(1, &spostato).unwrap();
         assert_eq!(db.load_sensor_positions(1), vec![spostato]);
 
-        // Un sensore mai trascinato resta descritto dalla sola parete.
+        // A sensor never dragged remains described by the wall alone.
         let altro = SensorPos {
             name: "S2".to_string(),
             face: 1,
@@ -589,14 +589,14 @@ mod tests {
         let _ = std::fs::remove_file(&percorso);
     }
 
-    /// Un database creato prima che i sensori potessero essere trascinati non ha
-    /// le colonne di posizione effettiva: l'apertura le aggiunge e le righe
-    /// vecchie si leggono come sensori rimasti sulla parete.
+    /// A database created before the sensors could be dragged does not have
+    /// the actual-position columns: opening adds them and the old rows are
+    /// read as sensors that stayed on the wall.
     #[test]
     fn migra_la_tabella_sensori_del_database_vecchio() {
         let percorso = db_temporaneo("thermite_migrazione_sensori_prova.db");
 
-        // Schema vecchio, esattamente quello delle versioni precedenti.
+        // Old schema, exactly the one of the previous versions.
         {
             let conn = Connection::open(&percorso).unwrap();
             conn.execute(
@@ -619,7 +619,7 @@ mod tests {
             .unwrap();
         }
 
-        // L'apertura con la versione nuova deve migrare lo schema.
+        // Opening with the new version must migrate the schema.
         let db = Database::open_at(&percorso);
         let caricate = db.load_sensor_positions(1);
         assert_eq!(caricate.len(), 1, "la riga vecchia deve sopravvivere");
@@ -629,8 +629,8 @@ mod tests {
             "una riga senza posizione è un sensore ancora sulla parete"
         );
 
-        // Una seconda apertura (ALTER già applicato) deve poter aggiornare la
-        // riga, cioè scrivere sulle colonne appena aggiunte.
+        // A second opening (ALTER already applied) must be able to update the
+        // row, that is, write on the just-added columns.
         let db2 = Database::open_at(&percorso);
         let spostato = SensorPos {
             pos: Some(Vec3::new(1.0, 1.0, 1.0)),

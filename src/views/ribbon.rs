@@ -1,5 +1,5 @@
-//! Barra multifunzione (ribbon) in stile Excel / ArtCraft: barra dei menu,
-//! schede, gruppi di comandi con icone, barra di stato e finestra "Informazioni".
+//! Excel / ArtCraft style ribbon: menu bar, tabs, command groups with icons,
+//! status bar and the "About Thermite" window.
 
 use crate::i18n::{self, Language};
 use crate::models::{Command, SelectedTab};
@@ -7,17 +7,17 @@ use crate::theme::{self, Icon};
 use crate::views::ViewState;
 use eframe::egui::{self, Align2, Color32, CornerRadius, FontId, RichText, Vec2};
 
-/// Disegna barra dei menu + nastro delle schede + gruppi di comandi.
+/// Draws the menu bar + the tab ribbon + the command groups.
 ///
-/// Lo sfondo non viene disegnato qui: lo fornisce il pannello superiore, che
-/// segue il tema corrente (chiaro/scuro). Qui aggiungiamo solo le linee di
-/// separazione in stile Office.
+/// The background is not drawn here: the top panel provides it, following the
+/// current theme (light/dark). Here we only add the Office-style separator
+/// lines.
 pub fn show_top_bar(ui: &mut egui::Ui, state: &ViewState) -> Option<Command> {
     let dark = ui.visuals().dark_mode;
     let lang = state.lang;
     let mut cmd: Option<Command> = show_menu_bar(ui, lang);
 
-    // --- Riga delle schede ---
+    // --- Tab row ---
     ui.horizontal(|ui| {
         for tab in SelectedTab::ALL {
             if ribbon_tab(ui, tab, state.current_tab, lang).clicked() {
@@ -38,18 +38,18 @@ pub fn show_top_bar(ui: &mut egui::Ui, state: &ViewState) -> Option<Command> {
 
     hairline(ui, dark);
 
-    // --- Gruppi di comandi della scheda corrente ---
+    // --- Command groups of the current tab ---
     if let Some(group_cmd) = show_groups(ui, state) {
         cmd = Some(group_cmd);
     }
 
-    // Bordo inferiore del nastro, per staccarlo dall'area di lavoro.
+    // Bottom border of the ribbon, to set it apart from the work area.
     hairline(ui, dark);
 
     cmd
 }
 
-/// Linea sottile a tutta larghezza, usata come separatore tra le zone del nastro.
+/// Full-width thin line, used as a separator between the ribbon areas.
 fn hairline(ui: &mut egui::Ui, dark: bool) {
     ui.add_space(1.0);
     let (rect, _) =
@@ -148,7 +148,7 @@ fn show_menu_bar(ui: &mut egui::Ui, lang: Language) -> Option<Command> {
     cmd
 }
 
-/// Una scheda del nastro; quella attiva è evidenziata con accento e barretta.
+/// A ribbon tab; the active one is highlighted with the accent color and a bar.
 fn ribbon_tab(
     ui: &mut egui::Ui,
     tab: SelectedTab,
@@ -172,11 +172,11 @@ fn ribbon_tab(
         ui.allocate_exact_size(Vec2::new(text_w + 24.0, 22.0), egui::Sense::click());
     let painter = ui.painter();
 
-    // La scheda attiva è individuata **solo** dalla cornice: nessun riempimento
-    // né sottolineatura, come ogni altra selezione del programma. L'evidenziazione
-    // del puntatore sopra la scheda resta, ma è un riscontro transitorio e non
-    // l'indicatore di selezione — per questo non viene disegnato sulla scheda
-    // attiva, che deve apparire come una cornice e basta.
+    // The active tab is identified **only** by its frame: no fill and no
+    // underline, like every other selection in the program. The pointer
+    // highlight over the tab remains, but it is transient feedback and not the
+    // selection indicator — which is why it is not drawn on the active tab,
+    // which must look like a frame and nothing more.
     let bg = if !active && resp.hovered() {
         theme::hover_bg(dark)
     } else {
@@ -202,7 +202,7 @@ fn ribbon_tab(
     resp.on_hover_text(tab.description(lang))
 }
 
-/// Gruppi di comandi della scheda attiva.
+/// Command groups of the active tab.
 fn show_groups(ui: &mut egui::Ui, state: &ViewState) -> Option<Command> {
     let mut cmd = None;
     let lang = state.lang;
@@ -454,7 +454,7 @@ fn export_group(ui: &mut egui::Ui, lang: Language, cmd: &mut Option<Command>) {
     });
 }
 
-/// Un gruppo di comandi con didascalia centrata e separatore verticale.
+/// A command group with a centered caption and a vertical separator.
 fn group(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui)) {
     let dark = ui.visuals().dark_mode;
     let rect = ui
@@ -464,7 +464,7 @@ fn group(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui)) {
                 add(ui);
                 ui.add_space(2.0);
             });
-            // spazio riservato alla didascalia
+            // space reserved for the caption
             ui.add_space(10.0);
         })
         .response
@@ -481,7 +481,7 @@ fn group(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui)) {
     ui.add(egui::Separator::default().vertical().spacing(6.0));
 }
 
-/// Barra di stato in basso, con progetto attivo, conteggi e messaggi.
+/// Status bar at the bottom, with the active project, counts and messages.
 pub fn show_status_bar(ui: &mut egui::Ui, state: &ViewState, project_count: usize) {
     let dark = ui.visuals().dark_mode;
     let muted = theme::muted(dark);
@@ -546,7 +546,7 @@ pub fn show_status_bar(ui: &mut egui::Ui, state: &ViewState, project_count: usiz
     });
 }
 
-/// Finestra modale "Informazioni su Thermite".
+/// "Informazioni su Thermite" modal window.
 pub fn show_about_window(ctx: &egui::Context, state: &mut ViewState) {
     if !state.show_about {
         return;

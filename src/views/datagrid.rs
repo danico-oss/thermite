@@ -1,4 +1,4 @@
-//! Scheda "Dati": griglia tabellare dei valori letti dai sensori.
+//! "Data" tab: table grid of the values read from the sensors.
 
 use crate::i18n;
 use crate::models::SelectedTab;
@@ -36,7 +36,7 @@ impl ViewState {
             return;
         };
 
-        // --- Intestazione con progetto attivo ---
+        // --- Header with active project ---
         let mut change_project = false;
         let mut reload = false;
         theme::card(ui, |ui| {
@@ -124,9 +124,9 @@ impl ViewState {
                     TableBuilder::new(ui)
                         .striped(true)
                         .resizable(true)
-                        // Scorrimento in entrambe le direzioni gestito dall'area
-                        // esterna: disattivando lo scorrimento interno della tabella
-                        // anche l'asse verticale resta visibile ai bordi della finestra.
+                        // Scrolling in both directions is handled by the outer
+                        // area: by disabling the table's internal scrolling,
+                        // the vertical axis also stays visible at the window edges.
                         .vscroll(false)
                         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                         .columns(Column::auto().at_least(90.0), headers.len())
@@ -142,7 +142,7 @@ impl ViewState {
                                         RichText::new(label)
                                             .strong()
                                             .size(11.5)
-                                            // Titoli in nero nel tema chiaro.
+                                            // Titles in black in the light theme.
                                             .color(theme::text_strong(dark)),
                                     );
                                 });
@@ -153,7 +153,7 @@ impl ViewState {
                                 body.row(text_height, |mut row_ui| {
                                     for (c, cell) in row.iter().enumerate() {
                                         row_ui.col(|ui| {
-                                            // Prima colonna (data/ora): testo in evidenza
+                                            // First column (date/time): emphasized text
                                             if c < 2 {
                                                 ui.label(
                                                     RichText::new(cell)

@@ -1,4 +1,4 @@
-//! Finestra "Configurazioni": scelta della lingua dell'interfaccia e del tema.
+//! "Settings" window: choice of the interface language and theme.
 
 use crate::i18n::{self, Language};
 use crate::settings;
@@ -7,8 +7,8 @@ use crate::views::ViewState;
 use eframe::egui::{self, Align2, RichText, Vec2};
 
 impl ViewState {
-    /// Disegna (se aperta) la finestra delle configurazioni e applica subito
-    /// le modifiche a lingua e tema, salvandole su disco.
+    /// Draws (if open) the configurations window and immediately applies
+    /// the language and theme changes, saving them to disk.
     pub fn show_settings_window(&mut self, ctx: &egui::Context) {
         if !self.show_settings {
             return;
@@ -28,7 +28,7 @@ impl ViewState {
             .show(ctx, |ui| {
                 ui.set_min_width(340.0);
 
-                // --- Lingua ---
+                // --- Language ---
                 theme::section_title(ui, i18n::t(lang, "Lingua"));
                 theme::hint(ui, i18n::t(lang, "Scegli la lingua dell'interfaccia."));
                 ui.add_space(4.0);
@@ -43,7 +43,7 @@ impl ViewState {
 
                 ui.add_space(12.0);
 
-                // --- Tema ---
+                // --- Theme ---
                 theme::section_title(ui, i18n::t(lang, "Tema"));
                 theme::hint(
                     ui,
@@ -74,8 +74,8 @@ impl ViewState {
                 ui.add_space(4.0);
 
                 ui.horizontal(|ui| {
-                    // Anteprima del testo nella lingua scelta (così l'utente
-                    // vede subito l'effetto della selezione).
+                    // Preview of the text in the chosen language (so the user
+                    // immediately sees the effect of the selection).
                     if theme::action_button(
                         ui,
                         Icon::Close,

@@ -1,4 +1,4 @@
-//! Scheda "Ricerca": elenco dei progetti con filtro e tabella in stile Excel.
+//! "Search" tab: list of projects with a filter and an Excel-style table.
 
 use crate::i18n;
 use crate::models::{Project, SelectedTab};
@@ -22,7 +22,7 @@ impl ViewState {
             .cloned()
             .collect();
 
-        // --- Barra di ricerca ---
+        // --- Search bar ---
         theme::card(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
@@ -90,16 +90,16 @@ impl ViewState {
             return;
         }
 
-        // --- Tabella dei risultati ---
+        // --- Results table ---
         let mut open_data: Option<Project> = None;
         let mut edit_project: Option<Project> = None;
         let mut select_project: Option<Project> = None;
 
         theme::card(ui, |ui| {
             ui.set_width(ui.available_width());
-            // Scorrimento in entrambe le direzioni: lo gestisce l'area esterna,
-            // mentre la tabella interna non attiva il proprio scorrimento verticale
-            // (altrimenti limita la larghezza e impedisce lo scorrimento orizzontale).
+            // Scrolling in both directions: the outer area handles it,
+            // while the inner table does not enable its own vertical scrolling
+            // (otherwise it constrains the width and prevents horizontal scrolling).
             egui::ScrollArea::both()
                 .max_height(ui.available_height() - 8.0)
                 .show(ui, |ui| {
@@ -211,20 +211,20 @@ impl ViewState {
                                         });
                                     });
 
-                                    // Un clic su una qualunque parte della riga
-                                    // (fuori dai pulsanti) seleziona il progetto.
+                                    // A click on any part of the row
+                                    // (outside the buttons) selects the project.
                                     let resp = row.response();
-                                    // Il doppio clic fa esattamente ciò che fa il
-                                    // pulsante "Apri dati" della stessa riga.
+                                    // A double click does exactly what the
+                                    // "Apri dati" button on the same row does.
                                     if resp.double_clicked() {
                                         open_data = Some(p.clone());
                                     }
                                     if resp.clicked() {
                                         select_project = Some(p.clone());
                                     }
-                                    // La selezione della riga è solo una cornice:
-                                    // `set_selected` di egui_extras, in alternativa,
-                                    // riempierebbe la riga con `selection.bg_fill`.
+                                    // Row selection is only a border:
+                                    // egui_extras' `set_selected`, alternatively,
+                                    // would fill the row with `selection.bg_fill`.
                                     if selected {
                                         let painter = resp.ctx.layer_painter(resp.layer_id);
                                         theme::selection_frame(
@@ -240,12 +240,12 @@ impl ViewState {
                 });
         });
 
-        // La selezione va gestita prima dell'apertura: con il doppio clic le due
-        // cose accadono nello stesso frame, e il messaggio di caricamento dei dati
-        // (o il suo errore) deve restare quello definitivo in barra di stato.
+        // Selection must be handled before opening: on a double click the two
+        // things happen in the same frame, and the data loading message
+        // (or its error) must remain the final one in the status bar.
         if let Some(p) = select_project {
-            // Selezione del progetto: la riga resta evidenziata e i relativi dati
-            // sono pronti per le operazioni (Gestione, apertura dati, ecc.).
+            // Project selection: the row stays highlighted and its data
+            // is ready for operations (Management, data opening, etc.).
             self.select_project_for_operations(&p);
             self.set_status(
                 format!(
@@ -260,8 +260,8 @@ impl ViewState {
         if let Some(p) = open_data {
             self.activate_project_and_load(p);
             self.current_tab = SelectedTab::DataGrid;
-            // L'apertura può fallire (file mancante o CRC non corrispondente):
-            // in quel caso si segnala l'errore, non un successo che non c'è stato.
+            // Opening can fail (missing file or mismatched CRC):
+            // in that case the error is reported, not a success that never occurred.
             match &self.csv_load_error {
                 Some(e) => self.set_status(format!("{} {e}", i18n::t(lang, "Errore:")), true),
                 None => {
@@ -285,7 +285,7 @@ impl ViewState {
     }
 }
 
-/// Mostra solo il nome del file, non tutto il percorso.
+/// Shows only the file name, not the whole path.
 fn file_name(path: &str) -> String {
     std::path::Path::new(path)
         .file_name()

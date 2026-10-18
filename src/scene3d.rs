@@ -1,17 +1,17 @@
-//! Geometria 3D minimale per la mappa dei sensori.
+//! Minimal 3D geometry for the sensor map.
 //!
-//! Il parallelepipedo è centrato nell'origine con dimensioni `SceneDims`
-//! (larghezza X, altezza Y, profondità Z). La proiezione è prospettica; la
-//! telecamera orbita attorno all'oggetto tramite imbardata (`yaw`) e beccheggio
-//! (`pitch`), con `zoom` che regola la scala.
+//! The box is centered at the origin with `SceneDims` dimensions
+//! (width X, height Y, depth Z). The projection is perspective; the
+//! camera orbits around the object via yaw (`yaw`) and pitch
+//! (`pitch`), with `zoom` that adjusts the scale.
 //!
-//! Il modulo è indipendente da egui: restituisce coordinate di schermo come
-//! coppie `(x, y)` con `y` verso il basso, così da poter essere riusato sia
-//! dalla vista interattiva sia dall'esportazione PDF.
+//! The module is independent from egui: it returns screen coordinates as
+//! `(x, y)` pairs with `y` pointing down, so that it can be reused both
+//! by the interactive view and by the PDF export.
 
 use crate::models::{SceneDims, SensorPos};
 
-/// Vettore 3D essenziale.
+/// Essential 3D vector.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Vec3 {
     pub x: f32,
@@ -45,14 +45,14 @@ impl Vec3 {
     }
 }
 
-/// Parametri della telecamera orbitale.
+/// Orbital camera parameters.
 #[derive(Clone, Copy, Debug)]
 pub struct Camera {
-    /// Rotazione attorno all'asse verticale, in radianti.
+    /// Rotation around the vertical axis, in radians.
     pub yaw: f32,
-    /// Inclinazione verticale, in radianti (limitata a ±~85°).
+    /// Vertical tilt, in radians (limited to ±~85°).
     pub pitch: f32,
-    /// Fattore di ingrandimento.
+    /// Magnification factor.
     pub zoom: f32,
 }
 
@@ -66,10 +66,10 @@ impl Default for Camera {
     }
 }
 
-/// Numero di facce del parallelepipedo.
+/// Number of faces of the box.
 pub const FACE_COUNT: usize = 6;
 
-/// Normale uscente della faccia `face` (0..5).
+/// Outward normal of face `face` (0..5).
 pub fn face_normal(face: usize) -> Vec3 {
     match face {
         0 => Vec3::new(1.0, 0.0, 0.0),
@@ -81,8 +81,8 @@ pub fn face_normal(face: usize) -> Vec3 {
     }
 }
 
-/// Distanza dell'origine dal piano che contiene la faccia `face`
-/// (l'equazione del piano è `normale · p = offset`).
+/// Distance of the origin from the plane containing face `face`
+/// (the plane equation is `normal · p = offset`).
 fn face_plane_offset(face: usize, dims: SceneDims) -> f32 {
     match face {
         0 | 1 => dims.w * 0.5,
@@ -91,7 +91,7 @@ fn face_plane_offset(face: usize, dims: SceneDims) -> f32 {
     }
 }
 
-/// Punto locale sulla faccia `face` per coordinate `u`, `v` in `[0, 1]`.
+/// Local point on face `face` for coordinates `u`, `v` in `[0, 1]`.
 pub fn face_point(face: usize, u: f32, v: f32, dims: SceneDims) -> Vec3 {
     let (hx, hy, hz) = (dims.w * 0.5, dims.h * 0.5, dims.d * 0.5);
     match face {
@@ -104,7 +104,7 @@ pub fn face_point(face: usize, u: f32, v: f32, dims: SceneDims) -> Vec3 {
     }
 }
 
-/// Inversa di [`face_point`]: coordinate `(u, v)` sulla faccia per un punto locale.
+/// Inverse of [`face_point`]: `(u, v)` coordinates on the face for a local point.
 pub fn face_uv(face: usize, p: Vec3, dims: SceneDims) -> (f32, f32) {
     let (hx, hy, hz) = (dims.w * 0.5, dims.h * 0.5, dims.d * 0.5);
     let (u, v) = match face {
@@ -118,7 +118,7 @@ pub fn face_uv(face: usize, p: Vec3, dims: SceneDims) -> (f32, f32) {
     (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
 }
 
-/// Proiettore prospettico: converte punti locali in coordinate di schermo.
+/// Perspective projector: converts local points into screen coordinates.
 #[derive(Clone, Copy)]
 pub struct Projector {
     yaw: f32,
@@ -130,8 +130,8 @@ pub struct Projector {
 }
 
 impl Projector {
-    /// Crea un proiettore con centro `(cx, cy)` e `viewport` = lato utile
-    /// dell'area di disegno (in pixel o millimetri: le unità restano coerenti).
+    /// Creates a projector with center `(cx, cy)` and `viewport` = the useful side
+    /// of the drawing area (in pixels or millimeters: the units stay consistent).
     pub fn new(cx: f32, cy: f32, viewport: f32, cam: &Camera, dims: SceneDims) -> Self {
         let radius = dims.half_diagonal().max(0.25);
         let dist = radius * 2.8 + 0.4;
@@ -146,7 +146,7 @@ impl Projector {
         }
     }
 
-    /// Applica la rotazione della telecamera (imbardata + beccheggio).
+    /// Applies the camera rotation (yaw + pitch).
     pub fn rotate(&self, p: Vec3) -> Vec3 {
         let (sy, cy) = self.yaw.sin_cos();
         let x1 = cy * p.x + sy * p.z;
@@ -157,7 +157,7 @@ impl Projector {
         Vec3::new(x1, y2, z2)
     }
 
-    /// Inversa della rotazione della telecamera.
+    /// Inverse of the camera rotation.
     pub fn rotate_inv(&self, q: Vec3) -> Vec3 {
         let (sp, cp) = self.pitch.sin_cos();
         let y1 = cp * q.y + sp * q.z;
@@ -168,35 +168,35 @@ impl Projector {
         Vec3::new(x, y1, z)
     }
 
-    /// Proietta un punto locale in coordinate di schermo `(x, y)` con `y` in basso.
+    /// Projects a local point into screen coordinates `(x, y)` with `y` at the bottom.
     pub fn project(&self, p: Vec3) -> (f32, f32) {
         let q = self.rotate(p);
         let dz = (self.dist - q.z).max(1e-4);
         (self.cx + self.focal * q.x / dz, self.cy - self.focal * q.y / dz)
     }
 
-    /// Distanza dalla telecamera (valori minori = più vicini).
+    /// Distance from the camera (smaller values = closer).
     pub fn depth(&self, p: Vec3) -> f32 {
         self.dist - self.rotate(p).z
     }
 
-    /// Punto locale che si proietta esattamente su `(sx, sy)` **mantenendo la
-    /// stessa distanza dalla telecamera** di `p`.
+    /// Local point that projects exactly onto `(sx, sy)` **while keeping the
+    /// same distance from the camera** as `p`.
     ///
-    /// È il trascinamento libero: il punto scorre nel piano parallelo alla
-    /// visuale che passa per `p` e non viene riportato su nessuna parete, perciò
-    /// può staccarsi dal container o entrarvi. Poiché quel piano è obliquo
-    /// rispetto al box ogni volta che la telecamera guarda da tre quarti, il
-    /// movimento che ne risulta ha componenti su `x`, `y` e `z` insieme: mentre
-    /// si trascina si sfruttano tutti e tre gli assi, non i soli due della
-    /// parete.
+    /// It is the free drag: the point slides in the plane parallel to the
+    /// view that passes through `p` and is not brought back onto any wall, so
+    /// it can detach from the container or enter it. Since that plane is oblique
+    /// with respect to the box whenever the camera looks from three quarters, the
+    /// movement that results has components on `x`, `y` and `z` together: while
+    /// dragging, all three axes are used, not only the two of the
+    /// wall.
     ///
-    /// La profondità è quella iniziale e resta fissa, quindi il punto non si
-    /// avvicina né si allontana mentre si muove.
+    /// The depth is the initial one and stays fixed, so the point neither
+    /// approaches nor moves away while it moves.
     ///
-    /// Se la telecamera guarda esattamente lungo gli assi il piano di
-    /// trascinamento coincide con un piano coordinato e una sola dimensione
-    /// resta invariata: è la geometria, non un limite della funzione.
+    /// If the camera looks exactly along the axes, the drag plane
+    /// coincides with a coordinate plane and a single dimension
+    /// stays unchanged: it is the geometry, not a limit of the function.
     pub fn drag_at_depth(&self, p: Vec3, sx: f32, sy: f32) -> Vec3 {
         let q = self.rotate(p);
         let dz = (self.dist - q.z).max(1e-4);
@@ -205,8 +205,8 @@ impl Projector {
         self.rotate_inv(Vec3::new(qx, qy, q.z))
     }
 
-    /// Ricostruisce il raggio (origine, direzione) in coordinate locali a partire
-    /// da un punto di schermo.
+    /// Reconstructs the ray (origin, direction) in local coordinates starting
+    /// from a screen point.
     pub fn unproject(&self, sx: f32, sy: f32) -> (Vec3, Vec3) {
         let ax = (sx - self.cx) / self.focal;
         let ay = -(sy - self.cy) / self.focal;
@@ -216,21 +216,21 @@ impl Projector {
     }
 }
 
-/// Una faccia proiettata, pronta per il disegno.
+/// A projected face, ready for drawing.
 #[derive(Clone, Copy)]
 pub struct FaceQuad {
-    /// I quattro angoli proiettati, nell'ordine (0,0) (1,0) (1,1) (0,1).
+    /// The four projected corners, in the order (0,0) (1,0) (1,1) (0,1).
     pub pts: [(f32, f32); 4],
-    /// Profondità media (per l'ordinamento dal fondo verso la telecamera).
+    /// Average depth (for sorting from the back toward the camera).
     pub depth: f32,
-    /// Fattore di luce 0.45..1.0 calcolato dalla normale della faccia.
+    /// Light factor 0.45..1.0 computed from the face normal.
     pub shade: f32,
 }
 
-/// Proietta le sei facce e le ordina da quella più lontana a quella più vicina.
+/// Projects the six faces and sorts them from the farthest to the nearest.
 pub fn face_quads(proj: &Projector, dims: SceneDims) -> Vec<FaceQuad> {
-    // Luce fissa nello spazio della telecamera (dall'alto a sinistra, verso
-    // l'osservatore) così che le facce frontali risultino illuminate.
+    // Fixed light in camera space (from the top left, toward
+    // the observer) so that the front faces appear lit.
     let light = Vec3::new(-0.35, 0.45, 0.82).normalized();
     let mut out: Vec<FaceQuad> = Vec::with_capacity(FACE_COUNT);
     let corners = [(0.0f32, 0.0f32), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
@@ -260,8 +260,8 @@ pub fn face_quads(proj: &Projector, dims: SceneDims) -> Vec<FaceQuad> {
     out
 }
 
-/// Individua la faccia colpita dal raggio `origin + t·dir` e restituisce
-/// `(faccia, u, v)`. Viene scelta la faccia più vicina alla telecamera.
+/// Finds the face hit by the ray `origin + t·dir` and returns
+/// `(face, u, v)`. The face nearest to the camera is chosen.
 pub fn pick_face(origin: Vec3, dir: Vec3, dims: SceneDims) -> Option<(usize, f32, f32)> {
     let h = Vec3::new(dims.w * 0.5, dims.h * 0.5, dims.d * 0.5);
     let mut best: Option<(usize, f32, Vec3)> = None;
@@ -297,13 +297,13 @@ pub fn pick_face(origin: Vec3, dir: Vec3, dims: SceneDims) -> Option<(usize, f32
     })
 }
 
-/// Posizione 3D (locale) di un sensore salvato.
+/// 3D (local) position of a saved sensor.
 ///
-/// Un sensore mai trascinato giace sulla parete `face` alle coordinate `u`, `v`
-/// e segue il container quando ne cambiano le dimensioni. Uno trascinato è
-/// conservato in coordinate normalizzate (frazi della mezza dimensione) e viene
-/// riportato in metri moltiplicando per le mezze dimensioni correnti: anche i
-/// sensori staccati dalla parete si adattano quindi agli nuovi ingombri.
+/// A sensor never dragged lies on wall `face` at coordinates `u`, `v`
+/// and follows the container when its dimensions change. A dragged one is
+/// stored in normalized coordinates (fractions of the half dimension) and is
+/// brought back to meters by multiplying by the current half dimensions: so even
+/// sensors detached from the wall adapt to the new sizes.
 pub fn sensor_point(pos: &SensorPos, dims: SceneDims) -> Vec3 {
     match pos.pos {
         Some(p) => Vec3::new(
@@ -315,11 +315,11 @@ pub fn sensor_point(pos: &SensorPos, dims: SceneDims) -> Vec3 {
     }
 }
 
-/// Converte una posizione locale assoluta in coordinate normalizzate, cioè
-/// l'operazione inversa di [`sensor_point`] per i sensori trascinati.
+/// Converts an absolute local position into normalized coordinates, that is
+/// the inverse operation of [`sensor_point`] for dragged sensors.
 ///
-/// Restituisce frazi della mezza dimensione: la faccia `x = larghezza/2`
-/// corrisponde a `x = 1.0`, l'origine a `0.0`.
+/// Returns fractions of the half dimension: the face `x = width/2`
+/// corresponds to `x = 1.0`, the origin to `0.0`.
 pub fn normalize_point(p: Vec3, dims: SceneDims) -> Vec3 {
     Vec3::new(
         p.x / (dims.w * 0.5),
@@ -356,12 +356,12 @@ mod tests {
     #[test]
     fn picking_trova_la_faccia_piu_vicina() {
         let d = dims();
-        // Raggio lungo -Z: colpisce la faccia +Z (indice 4).
+        // Ray along -Z: it hits the +Z face (index 4).
         let origin = Vec3::new(0.5, 0.0, 10.0);
         let dir = Vec3::new(0.0, 0.0, -1.0);
         let (face, u, v) = pick_face(origin, dir, d).expect("il raggio colpisce il solido");
         assert_eq!(face, 4);
-        // u lungo +X: (0.5 + 3.0) / 6.0 = 0.5833…
+        // u along +X: (0.5 + 3.0) / 6.0 = 0.5833…
         assert!((u - 0.583_333).abs() < 1e-3, "u = {u}");
         assert!((v - 0.5).abs() < 1e-3, "v = {v}");
     }
@@ -386,9 +386,9 @@ mod tests {
         assert!((v - 0.7).abs() < 1e-3, "v = {v}");
     }
 
-    /// Il trascinamento libero porta il punto esattamente sotto il cursore e non
-    /// ne cambia la distanza dalla telecamera. Non c'è alcun vincolo di parete,
-    /// quindi vale anche quando il punto è già staccato dal container.
+    /// The free drag brings the point exactly under the cursor and does not
+    /// change its distance from the camera. There is no wall constraint,
+    /// so it also holds when the point is already detached from the container.
     #[test]
     fn trascinamento_libero_segue_il_cursore_senza_cambiare_profondita() {
         let d = dims();
@@ -406,7 +406,7 @@ mod tests {
                     for (dx, dy) in [(0.0_f32, 0.0), (40.0, 0.0), (0.0, 40.0), (-40.0, -40.0)] {
                         let p = proj.drag_at_depth(p0, sx + dx, sy + dy);
 
-                        // Cade esattamente dove si punta...
+                        // It falls exactly where one points...
                         let (ax, ay) = proj.project(p);
                         let scarto = ((ax - sx - dx).powi(2) + (ay - sy - dy).powi(2)).sqrt();
                         assert!(
@@ -415,7 +415,7 @@ mod tests {
                              il punto cade a {scarto:.2}px dal cursore"
                         );
 
-                        // ...senza avvicinarsi né allontanarsi dalla camera.
+                        // ...without approaching or moving away from the camera.
                         assert!(
                             (proj.depth(p) - d0).abs() < 1e-3,
                             "yaw={yaw} pitch={pitch} faccia={face}: profondità {} invece di {d0}",
@@ -427,10 +427,10 @@ mod tests {
         }
     }
 
-    /// Con la telecamera da tre quarti il piano di trascinamento è obliquo
-    /// rispetto al container: muovendo il cursore il punto si sposta con
-    /// componenti su tutte e tre le direzioni, non sui soli due assi della
-    /// parete su cui giaceva.
+    /// With the camera from three quarters the drag plane is oblique
+    /// with respect to the container: moving the cursor the point shifts with
+    /// components on all three directions, not only on the two axes of the
+    /// wall it lay on.
     #[test]
     fn trascinamento_libero_agisce_su_tutti_e_tre_gli_assi() {
         let d = dims();
@@ -444,7 +444,7 @@ mod tests {
         let p0 = face_point(4, 0.5, 0.5, d);
         let (sx, sy) = proj.project(p0);
 
-        // Due direzioni ortogonali sullo schermo generano il piano di movimento.
+        // Two orthogonal directions on screen generate the movement plane.
         let direzioni = [
             proj.drag_at_depth(p0, sx + 60.0, sy).add(p0.scale(-1.0)),
             proj.drag_at_depth(p0, sx, sy + 60.0).add(p0.scale(-1.0)),
@@ -454,7 +454,7 @@ mod tests {
             .fold(0.0_f32, |a, v| a.max((v.x * v.x + v.y * v.y + v.z * v.z).sqrt()));
         assert!(raggio > 0.5, "spostamento troppo piccolo: {raggio}");
 
-        // Nessuna delle tre direzioni deve restare fuori portata.
+        // None of the three directions must stay out of reach.
         for (asse, componente) in [
             (
                 "x",

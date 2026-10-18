@@ -1,4 +1,4 @@
-//! Esportazione del grafico termico in PDF (A4 orizzontale, grafica vettoriale).
+//! Thermal chart export to PDF (A4 landscape, vector graphics).
 
 use crate::data::{self, Bounds, Series};
 use crate::i18n::{self, Language};
@@ -11,16 +11,16 @@ use std::path::Path;
 const PAGE_W: f32 = 297.0;
 const PAGE_H: f32 = 210.0;
 
-// Area del grafico (mm, origine in basso a sinistra).
+// Chart area (mm, origin at the bottom left).
 pub(crate) const LEFT: f32 = 44.0;
 pub(crate) const RIGHT: f32 = 283.0;
 pub(crate) const BOTTOM: f32 = 30.0;
 pub(crate) const TOP: f32 = 170.0;
 
-/// Dimensioni della pagina A4 orizzontale in millimetri.
+/// Dimensions of the A4 landscape page in millimeters.
 pub(crate) const PAGE_SIZE_MM: (f32, f32) = (PAGE_W, PAGE_H);
 
-/// Genera il PDF del grafico termico e lo scrive su disco.
+/// Generates the PDF of the thermal chart and writes it to disk.
 pub fn export_chart_pdf(
     path: &Path,
     project: &Project,
@@ -46,7 +46,7 @@ pub fn export_chart_pdf(
 }
 
 // ---------------------------------------------------------------------------
-// Costruzione della pagina
+// Page construction
 // ---------------------------------------------------------------------------
 
 fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -> Vec<Op> {
@@ -55,7 +55,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
     let text_color = rgb(0x20, 0x20, 0x20);
     let muted = rgb(0x70, 0x70, 0x70);
 
-    // --- Intestazione ---
+    // --- Header ---
     ops.extend(text(
         LEFT,
         199.0,
@@ -73,7 +73,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
         rgb(0x21, 0x73, 0x46),
     ));
 
-    // --- Riga informazioni ---
+    // --- Information row ---
     let info = format!(
         "{}: {}    {}: {:.1} °C / {:.1} °C    {}: {}    {}: {}",
         i18n::t(lang, "Container"),
@@ -100,7 +100,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
     let gw = text_w_mm(&generated, 8.5);
     ops.extend(text(RIGHT - gw, 187.0, &generated, 8.5, false, muted));
 
-    // File dati di origine
+    // Source data file
     ops.extend(text(
         LEFT,
         182.5,
@@ -114,10 +114,10 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
         muted,
     ));
 
-    // --- Legenda ---
+    // --- Legend ---
     ops.extend(legend_ops(series, 176.5));
 
-    // --- Sfondo area grafico ---
+    // --- Chart area background ---
     ops.push(Op::SetFillColor {
         col: rgb(0xFA, 0xFA, 0xFA).to_pdf(),
     });
@@ -125,7 +125,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
         polygon: rect_polygon(LEFT, BOTTOM, RIGHT, TOP),
     });
 
-    // --- Griglia e assi ---
+    // --- Grid and axes ---
     let y_step = nice_step(b.y_max - b.y_min, 6.0);
     let mut y_ticks: Vec<f64> = Vec::new();
     let mut y = (b.y_min / y_step).ceil() * y_step;
@@ -155,7 +155,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
         ));
     }
 
-    // --- Soglie di progetto ---
+    // --- Project thresholds ---
     let max_y = map_y(project.max_temp as f64, b);
     ops.extend(line(
         vec![(LEFT, max_y), (RIGHT, max_y)],
@@ -190,7 +190,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
         rgb(0x1F, 0x77, 0xB4),
     ));
 
-    // --- Serie dei sensori ---
+    // --- Sensor series ---
     for (i, s) in series.iter().enumerate() {
         if s.points.len() < 1 {
             continue;
@@ -205,7 +205,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
         if pts.len() > 1 {
             ops.extend(line(pts.clone(), 1.0, color, false));
         }
-        // Marcatori solo se i punti non sono troppi (leggibilità)
+        // Markers only when there are not too many points (readability)
         if pts.len() <= 90 {
             for (px, py) in &pts {
                 ops.push(Op::SetFillColor { col: color.to_pdf() });
@@ -216,7 +216,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
         }
     }
 
-    // --- Bordo area grafico ---
+    // --- Chart area border ---
     ops.push(Op::SetOutlineColor {
         col: rgb(0x9A, 0x9A, 0x9A).to_pdf(),
     });
@@ -236,7 +236,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
         },
     });
 
-    // --- Etichette assi ---
+    // --- Axis labels ---
     for ty in &y_ticks {
         let py = map_y(*ty, b);
         let label = format!("{:.1}", ty);
@@ -255,7 +255,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
     for tx in &x_ticks {
         let px = map_x(*tx, b);
         let label = data::format_timestamp(*tx);
-        // due righe: data e ora, per non sovrapporre le etichette
+        // two lines: date and time, so the labels do not overlap
         let (d, t) = label.split_once(' ').unwrap_or((label.as_str(), ""));
         let w = text_w_mm(&d, 7.0).max(text_w_mm(t, 7.0));
         ops.extend(text(px - w / 2.0, 24.5, t, 7.0, false, muted));
@@ -270,7 +270,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
         muted,
     ));
 
-    // --- Piè di pagina ---
+    // --- Footer ---
     ops.extend(text(
         LEFT,
         11.0,
@@ -284,7 +284,7 @@ fn build_page(project: &Project, series: &[Series], b: Bounds, lang: Language) -
 }
 
 // ---------------------------------------------------------------------------
-// Legenda
+// Legend
 // ---------------------------------------------------------------------------
 
 fn legend_ops(series: &[Series], y_top: f32) -> Vec<Op> {
@@ -324,7 +324,7 @@ fn legend_ops(series: &[Series], y_top: f32) -> Vec<Op> {
 }
 
 // ---------------------------------------------------------------------------
-// Utilità geometriche
+// Geometry helpers
 // ---------------------------------------------------------------------------
 
 pub(crate) fn map_x(x: f64, b: Bounds) -> f32 {
@@ -344,7 +344,7 @@ pub(crate) fn x_tick_values(b: Bounds, count: usize) -> Vec<f64> {
         .collect()
 }
 
-/// Passo "gradevole" per l'asse Y (1, 2, 5 × 10^n).
+/// "Nice" step for the Y axis (1, 2, 5 × 10^n).
 pub(crate) fn nice_step(range: f64, target: f64) -> f64 {
     if range <= 0.0 {
         return 1.0;
@@ -386,7 +386,7 @@ fn point(x: f32, y: f32) -> Point {
 }
 
 // ---------------------------------------------------------------------------
-// Utilità di disegno text / linee
+// Text / line drawing helpers
 // ---------------------------------------------------------------------------
 
 fn line(points: Vec<(f32, f32)>, width: f32, color: Rgbc, dashed: bool) -> Vec<Op> {
@@ -438,12 +438,12 @@ fn text(x: f32, y: f32, content: &str, size: f32, bold: bool, color: Rgbc) -> Ve
     ]
 }
 
-/// Larghezza stimata del testo in mm (Helvetica, larghezza media ≈ 0,5 em).
+/// Estimated text width in mm (Helvetica, average width ≈ 0.5 em).
 fn text_w_mm(s: &str, size_pt: f32) -> f32 {
     s.chars().count() as f32 * size_pt * 0.5 * 0.352_778
 }
 
-/// Colore RGB "Copy", convertito in [`printpdf::Color`] al momento del disegno.
+/// "Copy" RGB color, converted to [`printpdf::Color`] at drawing time.
 #[derive(Clone, Copy)]
 struct Rgbc(u8, u8, u8);
 
@@ -478,11 +478,11 @@ fn shorten(s: &str, max: usize) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Comando dell'interfaccia: salvataggio su file
+// UI command: saving to file
 // ---------------------------------------------------------------------------
 
 impl ViewState {
-    /// Chiede il percorso di destinazione e scrive il PDF del grafico indicato.
+    /// Asks for the destination path and writes the PDF of the given chart.
     pub fn write_pdf_with_dialog(&mut self, project: &Project, series: &[Series]) {
         let lang = self.lang;
         let default_name = format!("{}.pdf", safe_file_name(&project.name));
@@ -539,10 +539,10 @@ fn safe_file_name(name: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Esportazione della mappa 3D dei sensori
+// Export of the 3D sensor map
 // ---------------------------------------------------------------------------
 
-/// Genera il PDF della mappa 3D dei sensori e lo scrive su disco.
+/// Generates the PDF of the 3D sensor map and writes it to disk.
 pub fn export_map_pdf(
     path: &Path,
     project: &Project,
@@ -583,7 +583,7 @@ fn build_map_page(
     let text_color = rgb(0x20, 0x20, 0x20);
     let muted = rgb(0x70, 0x70, 0x70);
 
-    // --- Intestazione ---
+    // --- Header ---
     ops.extend(text(
         LEFT,
         199.0,
@@ -626,7 +626,7 @@ fn build_map_page(
     let gw = text_w_mm(&generated, 8.5);
     ops.extend(text(RIGHT - gw, 187.0, &generated, 8.5, false, muted));
 
-    // --- Sfondo area ---
+    // --- Area background ---
     ops.push(Op::SetFillColor {
         col: rgb(0xFA, 0xFA, 0xFA).to_pdf(),
     });
@@ -634,7 +634,7 @@ fn build_map_page(
         polygon: rect_polygon(LEFT, BOTTOM, RIGHT, TOP),
     });
 
-    // --- Scena 3D ---
+    // --- 3D scene ---
     let cx = (LEFT + RIGHT) * 0.5;
     let cy = (BOTTOM + TOP) * 0.5;
     let viewport = (RIGHT - LEFT).min(TOP - BOTTOM);
@@ -662,7 +662,7 @@ fn build_map_page(
         });
     }
 
-    // --- Sensori: punto, nome, temperatura minima / massima ---
+    // --- Sensors: point, name, minimum / maximum temperature ---
     for (i, p) in positions.iter().enumerate() {
         let (x, y) = proj.project(scene3d::sensor_point(p, dims));
         let (px, py) = (x, flip(y));
@@ -694,7 +694,7 @@ fn build_map_page(
         ops.extend(text(px + 2.2, py - 1.4, &temps, 7.0, false, muted));
     }
 
-    // --- Bordo area ---
+    // --- Area border ---
     ops.push(Op::SetOutlineColor {
         col: rgb(0x9A, 0x9A, 0x9A).to_pdf(),
     });
@@ -709,7 +709,7 @@ fn build_map_page(
         ),
     });
 
-    // --- Piè di pagina ---
+    // --- Footer ---
     ops.extend(text(
         LEFT,
         11.0,
@@ -722,7 +722,7 @@ fn build_map_page(
     ops
 }
 
-/// Poligono a partire da una lista di punti (mm), con la modalità indicata.
+/// Polygon from a list of points (mm), with the given paint mode.
 fn poly(points: Vec<(f32, f32)>, mode: PaintMode) -> Polygon {
     Polygon {
         rings: vec![PolygonRing {
@@ -733,7 +733,7 @@ fn poly(points: Vec<(f32, f32)>, mode: PaintMode) -> Polygon {
     }
 }
 
-/// Approssimazione poligonale di un cerchio (mm).
+/// Polygonal approximation of a circle (mm).
 fn circle_points(cx: f32, cy: f32, r: f32, n: usize) -> Vec<(f32, f32)> {
     (0..n)
         .map(|i| {
@@ -743,14 +743,14 @@ fn circle_points(cx: f32, cy: f32, r: f32, n: usize) -> Vec<(f32, f32)> {
         .collect()
 }
 
-/// Colore RGB moltiplicato per un fattore di luce.
+/// RGB color multiplied by a light factor.
 fn shade_pdf(r: u8, g: u8, b: u8, k: f32) -> Rgbc {
     let f = |v: u8| (v as f32 * k).clamp(0.0, 255.0) as u8;
     Rgbc(f(r), f(g), f(b))
 }
 
 impl ViewState {
-    /// Chiede il percorso di destinazione e scrive il PDF della mappa indicata.
+    /// Asks for the destination path and writes the PDF of the given map.
     pub fn write_map_pdf_with_dialog(&mut self, preview: &MapPreview) {
         let lang = self.lang;
         let default_name = format!("{}_mappa.pdf", safe_file_name(&preview.project.name));

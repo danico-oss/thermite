@@ -1,5 +1,5 @@
-//! Persistenza minimale delle preferenze dell'app (tema e lingua) su un piccolo
-//! file di testo nella cartella di lavoro, accanto al database.
+//! Minimal persistence of the app preferences (theme and language) to a small
+//! text file in the working directory, next to the database.
 
 use crate::i18n::Language;
 use std::path::PathBuf;
@@ -8,9 +8,9 @@ const FILE_NAME: &str = "thermite_settings.txt";
 
 #[derive(Clone, Debug)]
 pub struct Settings {
-    /// `true` = tema scuro, `false` = tema chiaro.
+    /// `true` = dark theme, `false` = light theme.
     pub dark_mode: bool,
-    /// Lingua dell'interfaccia.
+    /// Interface language.
     pub lang: Language,
 }
 
@@ -27,7 +27,7 @@ fn path() -> PathBuf {
     PathBuf::from(FILE_NAME)
 }
 
-/// Legge le preferenze dal file; se manca o è corrotto usa i valori predefiniti.
+/// Reads the preferences from the file; if it is missing or corrupt, uses the defaults.
 pub fn load() -> Settings {
     match std::fs::read_to_string(path()) {
         Ok(content) => parse(&content),
@@ -35,7 +35,7 @@ pub fn load() -> Settings {
     }
 }
 
-/// Interpreta il contenuto del file di preferenze (formato `chiave=valore`).
+/// Interprets the content of the preferences file (format `key=value`).
 fn parse(content: &str) -> Settings {
     let mut settings = Settings::default();
 
@@ -66,7 +66,7 @@ fn parse(content: &str) -> Settings {
     settings
 }
 
-/// Salva le preferenze; eventuali errori di scrittura vengono ignorati.
+/// Saves the preferences; any write errors are ignored.
 pub fn save(settings: &Settings) {
     let content = format!(
         "# Preferenze di Thermite (modificabili a mano)\n\
@@ -97,9 +97,9 @@ mod tests {
         assert!(parse("tema_scuro=Sì").dark_mode);
         assert!(!parse("dark_mode=false").dark_mode);
         assert!(!parse("dark_mode=no").dark_mode);
-        // righe ignorate / chiavi sconosciute
+        // ignored lines / unknown keys
         assert!(!parse("# commento\naltra=cosa\ndark_mode=0").dark_mode);
-        // contenuto vuoto / malformato -> predefinito
+        // empty / malformed content -> default
         assert!(!parse("").dark_mode);
         assert!(!parse("senza_uguale").dark_mode);
     }
@@ -109,7 +109,7 @@ mod tests {
         assert_eq!(parse("lang=pt-BR").lang, Language::PtBr);
         assert_eq!(parse("lingua=EN").lang, Language::En);
         assert_eq!(parse("language=it").lang, Language::It);
-        // valore sconosciuto -> resta il predefinito
+        // unknown value -> the default is kept
         assert_eq!(parse("lang=xx").lang, Language::It);
     }
 }

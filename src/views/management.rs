@@ -1,4 +1,4 @@
-//! Scheda "Gestione": inserimento / modifica / eliminazione dei progetti.
+//! "Management" tab: creating / editing / deleting projects.
 
 use crate::i18n;
 use crate::theme::{self, ButtonKind, Icon};
@@ -16,7 +16,7 @@ impl ViewState {
         let lang = self.lang;
         let editing = self.selected_edit_id;
 
-        // --- Intestazione pagina ---
+        // --- Page header ---
         ui.horizontal(|ui| {
             theme::section_title(
                 ui,
@@ -64,7 +64,7 @@ impl ViewState {
         });
         ui.add_space(6.0);
 
-        // --- Card del modulo ---
+        // --- Form card ---
         let mut save_clicked = false;
         let mut delete_clicked = false;
         let mut cancel_clicked = false;
@@ -160,13 +160,13 @@ impl ViewState {
                 ),
             );
 
-            // --- Messaggio di esito ---
+            // --- Outcome message ---
             if let Some((msg, is_err)) = self.feedback_msg.clone() {
                 ui.add_space(6.0);
                 theme::message_banner(ui, &msg, is_err);
             }
 
-            // --- Azioni ---
+            // --- Actions ---
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 if editing.is_none() {
@@ -228,7 +228,7 @@ impl ViewState {
             self.set_status(i18n::t(lang, "Modifica annullata."), false);
         }
 
-        // --- Scheda informativa ---
+        // --- Information card ---
         ui.add_space(6.0);
         theme::card(ui, |ui| {
             ui.set_width(ui.available_width());
@@ -252,7 +252,7 @@ impl ViewState {
         });
     }
 
-    /// Valida i campi del modulo e restituisce (min, max).
+    /// Validates the form fields and returns (min, max).
     fn validated_temps(&self) -> Result<(f32, f32), String> {
         let lang = self.lang;
         if self.name_input.trim().is_empty() {
@@ -278,7 +278,7 @@ impl ViewState {
         Ok((min, max))
     }
 
-    /// Salva il progetto (inserimento o aggiornamento).
+    /// Saves the project (insert or update).
     pub fn try_save(&mut self, conn: &rusqlite::Connection, reload_projects: &mut bool) {
         let lang = self.lang;
         let (min, max) = match self.validated_temps() {
@@ -289,8 +289,8 @@ impl ViewState {
             }
         };
 
-        // Il CRC32 del file dati viene calcolato qui, al momento del salvataggio,
-        // così resta sempre coerente con il percorso che si sta scrivendo.
+        // The data file's CRC32 is computed here, at save time, so that it
+        // always stays consistent with the path being written.
         let crc = crate::crc32::file_hex(&self.file_path_input);
 
         let result = match self.selected_edit_id {
@@ -347,7 +347,7 @@ impl ViewState {
         }
     }
 
-    /// Elimina il progetto attualmente in modifica.
+    /// Deletes the project currently being edited.
     pub fn try_delete(&mut self, conn: &rusqlite::Connection, reload_projects: &mut bool) {
         let lang = self.lang;
         let Some(id) = self.selected_edit_id else {

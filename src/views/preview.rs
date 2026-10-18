@@ -1,5 +1,5 @@
-//! Anteprima del PDF: mostra a video la pagina A4 orizzontale esattamente come
-//! verrà generata, con i pulsanti per salvarla o chiudere.
+//! PDF preview: shows the landscape A4 page on screen exactly as it will be
+//! generated, with the buttons to save or close it.
 
 use crate::data::{self, Series};
 use crate::export;
@@ -11,14 +11,14 @@ use eframe::egui::{
     self, Align2, Color32, CornerRadius, FontId, Rect, Stroke, StrokeKind, Vec2,
 };
 
-/// Dati necessari a disegnare l'anteprima (restano in memoria finché è aperta).
+/// Data needed to draw the preview (kept in memory while it is open).
 pub struct PdfPreview {
     pub project: Project,
     pub series: Vec<Series>,
 }
 
-// Colori "carta": l'anteprima rappresenta il foglio stampato, quindi non
-// segue il tema chiaro/scuro dell'applicazione.
+// "Paper" colors: the preview represents the printed sheet, so it does not
+// follow the application's light/dark theme.
 const PAPER: Color32 = Color32::WHITE;
 const INK: Color32 = Color32::from_rgb(0x20, 0x20, 0x20);
 const INK_MUTED: Color32 = Color32::from_rgb(0x70, 0x70, 0x70);
@@ -28,7 +28,7 @@ const AXIS: Color32 = Color32::from_rgb(0x9A, 0x9A, 0x9A);
 const ACCENT: Color32 = Color32::from_rgb(0x21, 0x73, 0x46);
 
 impl ViewState {
-    /// Apre la finestra di anteprima per il progetto attivo.
+    /// Opens the preview window for the active project.
     pub fn open_pdf_preview(&mut self) {
         let lang = self.lang;
         let Some(project) = self.active_project.clone() else {
@@ -64,7 +64,7 @@ impl ViewState {
         );
     }
 
-    /// Disegna la finestra di anteprima (se aperta).
+    /// Draws the preview window (if open).
     pub fn show_pdf_preview_window(&mut self, ctx: &egui::Context) {
         let Some(preview) = self.pdf_preview.take() else {
             return;
@@ -134,12 +134,12 @@ impl ViewState {
             self.set_status(i18n::t(lang, "Anteprima PDF chiusa."), false);
             return;
         }
-        // La finestra resta aperta: rimetti i dati per il prossimo frame.
+        // The window stays open: put the data back for the next frame.
         self.pdf_preview = Some(preview);
     }
 }
 
-/// Disegna la pagina completa sul rettangolo indicato, replicando il layout del PDF.
+/// Draws the full page on the given rectangle, replicating the PDF layout.
 fn draw_page(
     painter: &egui::Painter,
     page: Rect,
@@ -150,17 +150,17 @@ fn draw_page(
     let (pw_mm, ph_mm) = export::PAGE_SIZE_MM;
     let sx = page.width() / pw_mm;
 
-    // Da millimetri del PDF (origine in basso a sinistra) a punti schermo.
+    // From PDF millimeters (origin at the bottom left) to screen points.
     let mm = |x: f32, y: f32| {
         egui::pos2(
             page.left() + x * sx,
             page.top() + (ph_mm - y) * (page.height() / ph_mm),
         )
     };
-    // Dimensione carattere: da punti tipografici a pixel schermo.
+    // Font size: from typographic points to screen pixels.
     let fs = |pt: f32| (pt * 0.352_778 * sx).max(4.5);
 
-    // Foglio
+    // Sheet
     painter.rect_filled(page, CornerRadius::ZERO, PAPER);
     painter.rect_stroke(
         page,
@@ -180,7 +180,7 @@ fn draw_page(
         return;
     };
 
-    // --- Intestazione ---
+    // --- Header ---
     painter.text(
         mm(export::LEFT, 199.0),
         Align2::LEFT_BOTTOM,
@@ -238,7 +238,7 @@ fn draw_page(
         INK_MUTED,
     );
 
-    // --- Legenda (fino a due righe) ---
+    // --- Legend (up to two rows) ---
     let mut lx = export::LEFT;
     let mut row = 0usize;
     for (i, s) in series.iter().enumerate() {
@@ -277,14 +277,14 @@ fn draw_page(
         lx += item_w;
     }
 
-    // --- Area del grafico ---
+    // --- Chart area ---
     let area = Rect::from_two_pos(
         mm(export::LEFT, export::BOTTOM),
         mm(export::RIGHT, export::TOP),
     );
     painter.rect_filled(area, CornerRadius::ZERO, AREA_BG);
 
-    // Griglia orizzontale + etichette asse Y
+    // Horizontal grid + Y axis labels
     let step = export::nice_step(b.y_max - b.y_min, 6.0);
     let mut ty = (b.y_min / step).ceil() * step;
     let mut guard = 0;
@@ -312,7 +312,7 @@ fn draw_page(
         INK_MUTED,
     );
 
-    // Griglia verticale + etichette asse X
+    // Vertical grid + X axis labels
     let x_ticks = export::x_tick_values(b, 6);
     for tx in &x_ticks {
         let x = export::map_x(*tx, b);
@@ -346,7 +346,7 @@ fn draw_page(
         INK_MUTED,
     );
 
-    // --- Soglie (tratteggiate) ---
+    // --- Thresholds (dashed) ---
     let dash = 2.4 * sx;
     let gap = 1.9 * sx;
     let max_y = export::map_y(project.max_temp as f64, b);
@@ -379,7 +379,7 @@ fn draw_page(
         theme::series_color(0),
     );
 
-    // --- Serie ---
+    // --- Series ---
     for (i, s) in series.iter().enumerate() {
         if s.points.is_empty() {
             continue;
@@ -406,10 +406,10 @@ fn draw_page(
         }
     }
 
-    // --- Bordo area ---
+    // --- Area border ---
     painter.rect_stroke(area, CornerRadius::ZERO, Stroke::new(1.0_f32, AXIS), StrokeKind::Inside);
 
-    // --- Piè di pagina ---
+    // --- Footer ---
     painter.text(
         mm(export::LEFT, 11.0),
         Align2::LEFT_BOTTOM,

@@ -1,4 +1,4 @@
-//! Scheda "Grafico": grafico termico con soglie, toolbar ed esportazione PDF.
+//! "Chart" tab: thermal chart with thresholds, toolbar, and PDF export.
 
 use crate::data;
 use crate::i18n;
@@ -167,7 +167,7 @@ impl ViewState {
         });
         ui.add_space(6.0);
 
-        // --- Grafico ---
+        // --- Chart ---
         let mut plot = Plot::new("temperature_line_points_plot")
             .height((ui.available_height() - 12.0).max(240.0))
             .allow_zoom(true)
@@ -233,7 +233,7 @@ impl ViewState {
                     .width(1.4_f32),
             );
 
-            // --- Tooltip sul punto più vicino al cursore ---
+            // --- Tooltip on the point closest to the cursor ---
             if let Some(pointer_pos) = plot_ui.pointer_coordinate() {
                 let x_span = (bounds.x_max - bounds.x_min).max(1e-9);
                 let y_span = (bounds.y_max - bounds.y_min).max(1e-9);
@@ -258,7 +258,7 @@ impl ViewState {
                 }
 
                 if let Some((name, temp, d, t)) = best {
-                    // soglia in unità normalizzate: mostra solo se il punto è "vicino"
+                    // threshold in normalized units: show only if the point is "close"
                     if best_dist < 0.02 {
                         let tooltip = format!(
                             "{name}\n{d} {t}\n{temp:.2} °C"

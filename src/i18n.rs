@@ -1,12 +1,12 @@
-//! Internazionalizzazione dell'interfaccia.
+//! Interface internationalization.
 //!
-//! Le stringhe italiane sono la lingua di riferimento: nei punti dell'interfaccia
-//! si passa la stringa italiana a [`t`], che restituisce la traduzione nella lingua
-//! attiva. Se una traduzione manca, viene mostrato l'italiano (fallback sicuro).
+//! Italian strings are the reference language: at the interface points
+//! the Italian string is passed to [`t`], which returns the translation in the
+//! active language. If a translation is missing, Italian is shown (safe fallback).
 //!
-//! Le lingue supportate sono italiano, portoghese brasiliano e inglese.
+//! The supported languages are Italian, Brazilian Portuguese and English.
 
-/// Lingua dell'interfaccia.
+/// Interface language.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Language {
     It,
@@ -21,10 +21,10 @@ impl Default for Language {
 }
 
 impl Language {
-    /// Tutte le lingue supportate, nell'ordine mostrato nelle configurazioni.
+    /// All supported languages, in the order shown in the settings.
     pub const ALL: [Language; 3] = [Language::It, Language::PtBr, Language::En];
 
-    /// Nome della lingua nella lingua stessa (mostrato nel selettore).
+    /// Name of the language in the language itself (shown in the selector).
     pub fn label(self) -> &'static str {
         match self {
             Language::It => "Italiano",
@@ -33,7 +33,7 @@ impl Language {
         }
     }
 
-    /// Codice salvato nel file delle preferenze.
+    /// Code saved in the preferences file.
     pub fn code(self) -> &'static str {
         match self {
             Language::It => "it",
@@ -42,7 +42,7 @@ impl Language {
         }
     }
 
-    /// Interpreta un codice lingua (tollerante a maiuscole e varianti).
+    /// Parses a language code (tolerant of uppercase and variants).
     pub fn from_code(code: &str) -> Option<Language> {
         match code.trim().to_lowercase().as_str() {
             "it" | "ita" | "italiano" | "italian" => Some(Language::It),
@@ -55,7 +55,7 @@ impl Language {
     }
 }
 
-/// Traduce una stringa italiana nella lingua attiva.
+/// Translates an Italian string into the active language.
 pub fn t(lang: Language, it: &'static str) -> &'static str {
     match lang {
         Language::It => it,
@@ -64,7 +64,7 @@ pub fn t(lang: Language, it: &'static str) -> &'static str {
     }
 }
 
-/// Sceglie fra la forma singolare e plurale in base al numero.
+/// Chooses between the singular and plural form based on the number.
 pub fn plural(lang: Language, n: usize, one: &'static str, many: &'static str) -> &'static str {
     t(lang, if n == 1 { one } else { many })
 }
@@ -74,11 +74,11 @@ fn lookup(table: &'static [(&'static str, &'static str)], key: &str) -> Option<&
 }
 
 // ---------------------------------------------------------------------------
-// Inglese
+// English
 // ---------------------------------------------------------------------------
 
 static EN: &[(&str, &str)] = &[
-    // Menu e barra multifunzione
+    // Menu and ribbon
     ("File", "File"),
     ("Visualizza", "View"),
     ("Vai", "Go"),
@@ -98,7 +98,7 @@ static EN: &[(&str, &str)] = &[
     ("Configurazioni…", "Settings…"),
     ("Informazioni", "About"),
     ("Informazioni su Thermite", "About Thermite"),
-    // Schede
+    // Tabs
     ("Gestione", "Management"),
     ("Ricerca", "Search"),
     ("Dati", "Data"),
@@ -107,7 +107,7 @@ static EN: &[(&str, &str)] = &[
     ("Elenco e ricerca progetti", "Project list and search"),
     ("Griglia dati sensori", "Sensor data grid"),
     ("Grafico termico", "Thermal chart"),
-    // Gruppi
+    // Groups
     ("Progetto", "Project"),
     ("Archivio", "Archive"),
     ("Elenco", "List"),
@@ -115,7 +115,7 @@ static EN: &[(&str, &str)] = &[
     ("Esporta", "Export"),
     ("Serie", "Series"),
     ("Vista", "View"),
-    // Pulsanti
+    // Buttons
     ("Nuovo", "New"),
     ("Salva", "Save"),
     ("Elimina", "Delete"),
@@ -136,7 +136,7 @@ static EN: &[(&str, &str)] = &[
     ("Sfoglia…", "Browse…"),
     ("Salva PDF…", "Save PDF…"),
     ("Chiudi", "Close"),
-    // Suggerimenti (tooltip)
+    // Tooltips
     (
         "Svuota il modulo per inserire un nuovo progetto",
         "Clear the form to enter a new project",
@@ -203,7 +203,7 @@ static EN: &[(&str, &str)] = &[
         "View the grid and thermal chart",
     ),
     ("Modifica o elimina il progetto", "Edit or delete the project"),
-    // Barra di stato
+    // Status bar
     ("Pronto", "Ready"),
     ("progetto", "project"),
     ("progetti", "projects"),
@@ -236,7 +236,7 @@ static EN: &[(&str, &str)] = &[
     ("aggiornato con successo!", "updated successfully!"),
     ("salvato con successo!", "saved successfully!"),
     ("eliminato.", "deleted."),
-    // Scheda Gestione
+    // Management tab
     ("Modifica progetto", "Edit project"),
     ("ID univoco", "Unique ID"),
     ("ID assegnato automaticamente", "ID assigned automatically"),
@@ -298,7 +298,7 @@ static EN: &[(&str, &str)] = &[
         "Nessun progetto selezionato da eliminare.",
         "No project selected to delete.",
     ),
-    // Scheda Ricerca
+    // Search tab
     (
         "Filtra per nome o tipo di container…",
         "Filter by name or container type…",
@@ -318,7 +318,7 @@ static EN: &[(&str, &str)] = &[
     ("Max °C", "Max °C"),
     ("Azioni", "Actions"),
     ("di", "of"),
-    // Scheda Dati
+    // Data tab
     (
         "Nessun progetto attivo selezionato.",
         "No active project selected.",
@@ -333,7 +333,7 @@ static EN: &[(&str, &str)] = &[
     ),
     ("Valori dei sensori", "Sensor values"),
     ("Colonna", "Column"),
-    // Scheda Grafico
+    // Chart tab
     (
         "Apri un progetto dalla scheda Ricerca per vedere il grafico.",
         "Open a project in the Search tab to see the chart.",
@@ -351,7 +351,7 @@ static EN: &[(&str, &str)] = &[
     ("a", "to"),
     ("Max", "Max"),
     ("Min", "Min"),
-    // Caricamento dati
+    // Data loading
     (
         "Seleziona il file dati dei sensori (CSV o Excel)",
         "Select the sensor data file (CSV or Excel)",
@@ -384,7 +384,7 @@ static EN: &[(&str, &str)] = &[
         "Per accettare il nuovo file, risalva il progetto dalla scheda Gestione.",
         "To accept the new file, re-save the project from the Management tab.",
     ),
-    // Anteprima e PDF
+    // Preview and PDF
     (
         "Nessun progetto attivo: apri prima i dati di un progetto dalla scheda Ricerca.",
         "No active project: first open a project's data in the Search tab.",
@@ -436,7 +436,7 @@ static EN: &[(&str, &str)] = &[
     ),
     ("Grafico esportato in PDF:", "Chart exported to PDF:"),
     ("Errore esportazione PDF:", "PDF export error:"),
-    // Configurazioni
+    // Settings
     ("Configurazioni", "Settings"),
     ("Lingua", "Language"),
     (
@@ -454,7 +454,7 @@ static EN: &[(&str, &str)] = &[
         "Le modifiche vengono salvate automaticamente.",
         "Changes are saved automatically.",
     ),
-    // Informazioni
+    // About
     ("Mappatura Termica di Trasporto", "Thermal Transport Mapping"),
     (
         "Applicazione desktop in Rust (egui / eframe) per gestire la mappatura termica di trasporto, l'analisi dei dati dei sensori (CSV / Excel) e la produzione di grafici e mappa 3D delle posizioni dei sensori.",
@@ -468,7 +468,7 @@ static EN: &[(&str, &str)] = &[
         "Thermite · Mappatura Termica di Trasporto",
         "Thermite · Thermal Transport Mapping",
     ),
-    // Scheda Sensori 3D
+    // 3D Sensors tab
     ("Sensori 3D", "3D Sensors"),
     (
         "Posizione dei sensori nel container 3D",
@@ -556,11 +556,11 @@ static EN: &[(&str, &str)] = &[
 ];
 
 // ---------------------------------------------------------------------------
-// Portoghese brasiliano
+// Brazilian Portuguese
 // ---------------------------------------------------------------------------
 
 static PT: &[(&str, &str)] = &[
-    // Menu e barra multifunzione
+    // Menu and ribbon
     ("File", "Arquivo"),
     ("Visualizza", "Exibir"),
     ("Vai", "Ir"),
@@ -580,7 +580,7 @@ static PT: &[(&str, &str)] = &[
     ("Configurazioni…", "Configurações…"),
     ("Informazioni", "Sobre"),
     ("Informazioni su Thermite", "Sobre o Thermite"),
-    // Schede
+    // Tabs
     ("Gestione", "Gerenciamento"),
     ("Ricerca", "Pesquisa"),
     ("Dati", "Dados"),
@@ -589,7 +589,7 @@ static PT: &[(&str, &str)] = &[
     ("Elenco e ricerca progetti", "Lista e pesquisa de projetos"),
     ("Griglia dati sensori", "Grade de dados dos sensores"),
     ("Grafico termico", "Gráfico térmico"),
-    // Gruppi
+    // Groups
     ("Progetto", "Projeto"),
     ("Archivio", "Repositório"),
     ("Elenco", "Lista"),
@@ -597,7 +597,7 @@ static PT: &[(&str, &str)] = &[
     ("Esporta", "Exportar"),
     ("Serie", "Séries"),
     ("Vista", "Exibição"),
-    // Pulsanti
+    // Buttons
     ("Nuovo", "Novo"),
     ("Salva", "Salvar"),
     ("Elimina", "Excluir"),
@@ -618,7 +618,7 @@ static PT: &[(&str, &str)] = &[
     ("Sfoglia…", "Procurar…"),
     ("Salva PDF…", "Salvar PDF…"),
     ("Chiudi", "Fechar"),
-    // Suggerimenti (tooltip)
+    // Tooltips
     (
         "Svuota il modulo per inserire un nuovo progetto",
         "Limpa o formulário para inserir um novo projeto",
@@ -685,7 +685,7 @@ static PT: &[(&str, &str)] = &[
         "Exibe a grade e o gráfico térmico",
     ),
     ("Modifica o elimina il progetto", "Edita ou exclui o projeto"),
-    // Barra di stato
+    // Status bar
     ("Pronto", "Pronto"),
     ("progetto", "projeto"),
     ("progetti", "projetos"),
@@ -718,7 +718,7 @@ static PT: &[(&str, &str)] = &[
     ("aggiornato con successo!", "atualizado com sucesso!"),
     ("salvato con successo!", "salvo com sucesso!"),
     ("eliminato.", "excluído."),
-    // Scheda Gestione
+    // Management tab
     ("Modifica progetto", "Editar projeto"),
     ("ID univoco", "ID exclusivo"),
     ("ID assegnato automaticamente", "ID atribuído automaticamente"),
@@ -780,7 +780,7 @@ static PT: &[(&str, &str)] = &[
         "Nessun progetto selezionato da eliminare.",
         "Nenhum projeto selecionado para excluir.",
     ),
-    // Scheda Ricerca
+    // Search tab
     (
         "Filtra per nome o tipo di container…",
         "Filtra por nome ou tipo de contêiner…",
@@ -800,7 +800,7 @@ static PT: &[(&str, &str)] = &[
     ("Max °C", "Máx °C"),
     ("Azioni", "Ações"),
     ("di", "de"),
-    // Scheda Dati
+    // Data tab
     (
         "Nessun progetto attivo selezionato.",
         "Nenhum projeto ativo selecionado.",
@@ -815,7 +815,7 @@ static PT: &[(&str, &str)] = &[
     ),
     ("Valori dei sensori", "Valores dos sensores"),
     ("Colonna", "Coluna"),
-    // Scheda Grafico
+    // Chart tab
     (
         "Apri un progetto dalla scheda Ricerca per vedere il grafico.",
         "Abra um projeto na aba Pesquisa para ver o gráfico.",
@@ -833,7 +833,7 @@ static PT: &[(&str, &str)] = &[
     ("a", "a"),
     ("Max", "Máx"),
     ("Min", "Mín"),
-    // Caricamento dati
+    // Data loading
     (
         "Seleziona il file dati dei sensori (CSV o Excel)",
         "Selecione o arquivo de dados dos sensores (CSV ou Excel)",
@@ -866,7 +866,7 @@ static PT: &[(&str, &str)] = &[
         "Per accettare il nuovo file, risalva il progetto dalla scheda Gestione.",
         "Para aceitar o novo arquivo, salve novamente o projeto na aba Gestão.",
     ),
-    // Anteprima e PDF
+    // Preview and PDF
     (
         "Nessun progetto attivo: apri prima i dati di un progetto dalla scheda Ricerca.",
         "Nenhum projeto ativo: abra primeiro os dados de um projeto na aba Pesquisa.",
@@ -918,7 +918,7 @@ static PT: &[(&str, &str)] = &[
     ),
     ("Grafico esportato in PDF:", "Gráfico exportado em PDF:"),
     ("Errore esportazione PDF:", "Erro ao exportar PDF:"),
-    // Configurazioni
+    // Settings
     ("Configurazioni", "Configurações"),
     ("Lingua", "Idioma"),
     (
@@ -936,7 +936,7 @@ static PT: &[(&str, &str)] = &[
         "Le modifiche vengono salvate automaticamente.",
         "As alterações são salvas automaticamente.",
     ),
-    // Informazioni
+    // About
     (
         "Mappatura Termica di Trasporto",
         "Mapeamento Térmico de Transporte",
@@ -953,7 +953,7 @@ static PT: &[(&str, &str)] = &[
         "Thermite · Mappatura Termica di Trasporto",
         "Thermite · Mapeamento Térmico de Transporte",
     ),
-    // Scheda Sensori 3D
+    // 3D Sensors tab
     ("Sensori 3D", "Sensores 3D"),
     (
         "Posizione dei sensori nel container 3D",

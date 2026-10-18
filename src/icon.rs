@@ -1,24 +1,24 @@
-//! Icona del programma: un cubo isometrico (il container del trasporto) con
-//! un gradiente termico che va dal blu "freddo" in basso a sinistra al rosso
-//! "caldo" in alto a destra.
+//! Program icon: an isometric cube (the transport container) with a thermal
+//! gradient that runs from "cold" blue at the bottom left to "warm" red at
+//! the top right.
 //!
-//! Il disegno è procedurale (nessuna libreria di immagini, nessun file
-//! esterno): la stessa funzione produce i pixel della finestra e il file
-//! `assets/thermite.ico` usato per l'icona del .exe.
+//! The drawing is procedural (no image library, no external file): the same
+//! function produces the window pixels and the `assets/thermite.ico` file
+//! used for the .exe icon.
 
 use eframe::egui;
 
-/// Blu "freddo" del gradiente termico.
+/// "Cold" blue of the thermal gradient.
 const FREDDO: [f32; 3] = [36.0, 104.0, 216.0];
-/// Rosso "caldo" del gradiente termico.
+/// "Warm" red of the thermal gradient.
 const CALDO: [f32; 3] = [238.0, 62.0, 38.0];
-/// Luminosità relativa delle tre facce del cubo: [alto, sinistra, destra].
+/// Relative brightness of the cube's three faces: [top, left, right].
 const FACCE: [f32; 3] = [1.12, 0.86, 0.62];
-/// Fattore di supercampionamento: i bordi restano nitidi senza antialiasing
-/// esterno, poi l'immagine viene ridotta con filtro a scatola.
+/// Supersampling factor: the edges stay sharp without external antialiasing,
+/// and the image is then downscaled with a box filter.
 const SS: u32 = 4;
 
-/// Icona da passare a `ViewportBuilder::with_icon`.
+/// Icon to pass to `ViewportBuilder::with_icon`.
 pub fn egui_icon(size: u32) -> egui::IconData {
     egui::IconData {
         rgba: render(size),
@@ -27,7 +27,7 @@ pub fn egui_icon(size: u32) -> egui::IconData {
     }
 }
 
-/// Pixel RGBA (canale alfa non premultiplicato) dell'icona a `size`×`size`.
+/// RGBA pixels (non-premultiplied alpha channel) of the icon at `size`×`size`.
 pub fn render(size: u32) -> Vec<u8> {
     let size = size.max(8);
     let big = size * SS;
@@ -36,27 +36,27 @@ pub fn render(size: u32) -> Vec<u8> {
     riduci(&buf, big, size)
 }
 
-/// Temperatura di un punto: `0.0` = freddo, `1.0` = caldo. Il gradiente corre
-/// in diagonale, dal basso a sinistra (freddo) all'alto a destra (caldo).
+/// Temperature of a point: `0.0` = cold, `1.0` = warm. The gradient runs
+/// diagonally, from the bottom left (cold) to the top right (warm).
 fn temperatura(px: f32, py: f32) -> f32 {
     ((px + (1.0 - py)) / 2.0).clamp(0.0, 1.0)
 }
 
-/// Disegna il cubo su una tela `n`×`n` trasparente (coordinate normalizzate).
+/// Draws the cube on a transparent `n`×`n` canvas (normalized coordinates).
 fn disegna(buf: &mut [u8], n: u32) {
-    // Vertici del cubo isometrico.
+    // Vertices of the isometric cube.
     let (cx, alto, a, b, c) = (0.5, 0.085, 0.40, 0.19, 0.44);
     let vertici = [
-        [cx, alto],             // cima
-        [cx + a, alto + b],     // alto destra
-        [cx, alto + 2.0 * b],   // centro (vertice medio basso della faccia alta)
-        [cx - a, alto + b],     // alto sinistra
-        [cx - a, alto + b + c], // basso sinistra
-        [cx, alto + 2.0 * b + c], // basso centro
-        [cx + a, alto + b + c], // basso destra
+        [cx, alto],             // top
+        [cx + a, alto + b],     // upper right
+        [cx, alto + 2.0 * b],   // center (lower middle vertex of the top face)
+        [cx - a, alto + b],     // upper left
+        [cx - a, alto + b + c], // lower left
+        [cx, alto + 2.0 * b + c], // lower center
+        [cx + a, alto + b + c], // lower right
     ];
     let [t, r, m, l, lb, bb, rb] = vertici;
-    // Le tre facce visibili: alta, sinistra, destra (tutte in senso orario).
+    // The three visible faces: top, left, right (all clockwise).
     let facce = [[t, r, m, l], [l, m, bb, lb], [m, r, rb, bb]];
 
     let f = n as f32;
@@ -101,7 +101,7 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
-/// Punto dentro un quadrilatero convesso (test dei prodotti vettoriali).
+/// Point inside a convex quadrilateral (cross product test).
 fn dentro_quad(px: f32, py: f32, q: &[[f32; 2]; 4]) -> bool {
     let mut pos = false;
     let mut neg = false;
@@ -121,8 +121,8 @@ fn dentro_quad(px: f32, py: f32, q: &[[f32; 2]; 4]) -> bool {
     true
 }
 
-/// Riduzione con filtro a scatola: media pesata per l'alfa, così i bordi non
-/// diventano scuri quando l'immagine viene vista su sfondo chiaro.
+/// Downscaling with a box filter: average weighted by alpha, so the edges do
+/// not turn dark when the image is viewed on a light background.
 fn riduci(buf: &[u8], big: u32, size: u32) -> Vec<u8> {
     let s = (big / size) as usize;
     let mut out = vec![0u8; (size * size * 4) as usize];
@@ -157,11 +157,11 @@ mod tests {
     use super::*;
     use std::path::Path;
 
-    /// Taglie inserite nel file `.ico` (come da pratica corrente su Windows).
+    /// Sizes stored in the `.ico` file (as per current Windows practice).
     const TAGLIE: [u32; 6] = [16, 24, 32, 48, 64, 256];
 
-    /// Scrive `assets/thermite.ico` (rigenerato ogni volta che girano i test):
-    /// serve al `build.rs` per incorporare l'icona nel file .exe.
+    /// Writes `assets/thermite.ico` (regenerated every time the tests run):
+    /// used by `build.rs` to embed the icon into the .exe file.
     #[test]
     fn scrivi_file_ico() {
         std::fs::create_dir_all("assets").expect("cartella assets");
@@ -170,7 +170,7 @@ mod tests {
         std::fs::write("assets/thermite.ico", &bytes).expect("scrittura assets/thermite.ico");
     }
 
-    /// Controllo che le voci dell'ico siano coerenti (offset e dimensioni).
+    /// Checks that the ico entries are consistent (offsets and sizes).
     #[test]
     fn ico_interna_coerente() {
         let bytes = costruisci_ico(&TAGLIE);
@@ -188,9 +188,9 @@ mod tests {
         }
     }
 
-    /// Genera un "foglio di contatto" PNG da guardare per verificare il
-    /// disegno sia su sfondo chiaro sia su sfondo scuro, e salva anche
-    /// `assets/thermite.png` a 256 px come riferimento.
+    /// Generates a PNG "contact sheet" to look at in order to check the
+    /// drawing on both a light and a dark background, and also saves
+    /// `assets/thermite.png` at 256 px as a reference.
     #[test]
     fn anteprime_png() {
         std::fs::create_dir_all("assets").expect("cartella assets");
@@ -201,10 +201,10 @@ mod tests {
         scrivi_png(Path::new("assets/thermite.png"), &rgba, 256, 256);
     }
 
-    /// Campiona alcuni pixel per verificare che la geometria sia quella
-    /// voluta: fuori dal cubo è trasparente, le tre facce sono opache, la
-    /// faccia sinistra è fredda (blu), quella destra più calda, e la
-    /// luminosità decresce da alto → sinistra → destra.
+    /// Samples a few pixels to check that the geometry is the intended one:
+    /// outside the cube it is transparent, the three faces are opaque, the
+    /// left face is cold (blue), the right one warmer, and the brightness
+    /// decreases from top → left → right.
     #[test]
     fn geometria_cubo() {
         let s = 256u32;
@@ -216,26 +216,26 @@ mod tests {
         let calore = |p: [u8; 4]| p[0] as i32 - p[2] as i32;
         let lum = |p: [u8; 4]| p[0] as u32 + p[1] as u32 + p[2] as u32;
 
-        // Fuori dal cubo: trasparente.
+        // Outside the cube: transparent.
         for (x, y) in [(0.03, 0.03), (0.97, 0.03), (0.03, 0.97), (0.50, 0.99)] {
             let p = px(x, y);
             assert_eq!(p[3], 0, "trasparente a ({x}, {y}): {p:?}");
         }
-        // Le tre facce: opache.
+        // The three faces: opaque.
         let alta = px(0.50, 0.27);
         let sinistra = px(0.25, 0.60);
         let destra = px(0.75, 0.60);
         for (nome, p) in [("alta", alta), ("sinistra", sinistra), ("destra", destra)] {
             assert_eq!(p[3], 255, "faccia {nome} opaca: {p:?}");
         }
-        // Calore: sinistra fredda, destra e alta più calde.
+        // Heat: left cold, right and top warmer.
         assert!(calore(sinistra) < 0, "sinistra fredda: {sinistra:?}");
         assert!(calore(alta) > calore(sinistra), "alta più calda di sinistra");
         assert!(
             calore(destra) > calore(sinistra),
             "destra più calda di sinistra"
         );
-        // Luminosità: alto > sinistra > destra (facce diverse).
+        // Brightness: top > left > right (different faces).
         assert!(lum(alta) > lum(sinistra), "alta più luminosa: {alta:?}");
         assert!(
             lum(sinistra) > lum(destra),
@@ -243,7 +243,7 @@ mod tests {
         );
     }
 
-    // --- costruzione file -------------------------------------------------
+    // --- file construction -------------------------------------------------
 
     fn costruisci_ico(taglie: &[u32]) -> Vec<u8> {
         let voci: Vec<(u32, Vec<u8>)> = taglie
@@ -252,18 +252,18 @@ mod tests {
             .collect();
         let n = voci.len() as u16;
         let mut out: Vec<u8> = Vec::new();
-        out.extend_from_slice(&0u16.to_le_bytes()); // riservato
-        out.extend_from_slice(&1u16.to_le_bytes()); // tipo = icone
+        out.extend_from_slice(&0u16.to_le_bytes()); // reserved
+        out.extend_from_slice(&1u16.to_le_bytes()); // type = icons
         out.extend_from_slice(&n.to_le_bytes());
         let mut offset = 6 + 16 * n as u32;
         for (s, data) in &voci {
             let b = if *s >= 256 { 0u8 } else { *s as u8 };
-            out.push(b); // larghezza (0 = 256)
-            out.push(b); // altezza
-            out.push(0); // colori in palette
-            out.push(0); // riservato
+            out.push(b); // width (0 = 256)
+            out.push(b); // height
+            out.push(0); // palette colors
+            out.push(0); // reserved
             out.extend_from_slice(&1u16.to_le_bytes()); // planes
-            out.extend_from_slice(&32u16.to_le_bytes()); // bit/pixel
+            out.extend_from_slice(&32u16.to_le_bytes()); // bits/pixel
             out.extend_from_slice(&(data.len() as u32).to_le_bytes());
             out.extend_from_slice(&offset.to_le_bytes());
             offset += data.len() as u32;
@@ -274,40 +274,40 @@ mod tests {
         out
     }
 
-    /// Voce ICO in formato BMP 32 bit (XOR + maschera AND).
+    /// ICO entry in 32-bit BMP format (XOR + AND mask).
     fn dati_bmp_ico(rgba: &[u8], s: u32) -> Vec<u8> {
         let passo_maschera = ((s + 31) / 32) * 4;
         let xor = s * s * 4;
         let totale = xor + passo_maschera * s;
         let mut d: Vec<u8> = Vec::with_capacity(40 + totale as usize);
-        d.extend_from_slice(&40u32.to_le_bytes()); // dimensione BITMAPINFOHEADER
+        d.extend_from_slice(&40u32.to_le_bytes()); // BITMAPINFOHEADER size
         d.extend_from_slice(&(s as i32).to_le_bytes());
-        d.extend_from_slice(&((s * 2) as i32).to_le_bytes()); // altezza doppia
+        d.extend_from_slice(&((s * 2) as i32).to_le_bytes()); // double height
         d.extend_from_slice(&1u16.to_le_bytes()); // planes
-        d.extend_from_slice(&32u16.to_le_bytes()); // bit/pixel
-        d.extend_from_slice(&0u32.to_le_bytes()); // compressione BI_RGB
+        d.extend_from_slice(&32u16.to_le_bytes()); // bits/pixel
+        d.extend_from_slice(&0u32.to_le_bytes()); // BI_RGB compression
         d.extend_from_slice(&totale.to_le_bytes());
         d.extend_from_slice(&0i32.to_le_bytes()); // dpi x
         d.extend_from_slice(&0i32.to_le_bytes()); // dpi y
-        d.extend_from_slice(&0u32.to_le_bytes()); // colori in palette
-        d.extend_from_slice(&0u32.to_le_bytes()); // colori importanti
+        d.extend_from_slice(&0u32.to_le_bytes()); // palette colors
+        d.extend_from_slice(&0u32.to_le_bytes()); // important colors
         for y in (0..s).rev() {
             for x in 0..s {
                 let o = ((y * s + x) * 4) as usize;
                 d.push(rgba[o + 2]); // B
                 d.push(rgba[o + 1]); // G
                 d.push(rgba[o]); // R
-                d.push(rgba[o + 3]); // A (maschera AND: basta il canale alfa)
+                d.push(rgba[o + 3]); // A (AND mask: the alpha channel is enough)
             }
         }
-        d.extend(std::iter::repeat_n(0u8, totale as usize - xor as usize)); // AND a zero
+        d.extend(std::iter::repeat_n(0u8, totale as usize - xor as usize)); // AND set to zero
         d
     }
 
-    // --- anteprime --------------------------------------------------------
+    // --- previews --------------------------------------------------------
 
-    /// Compone icone a grandezze diverse su due metà: bianco sopra, grigio
-    /// scuro sotto. Restituisce la tela RGBA (larghezza, altezza).
+    /// Composes icons of different sizes on two halves: white on top, dark
+    /// gray below. Returns the RGBA canvas (width, height).
     fn foglio(taglie: &[u32]) -> (Vec<u8>, u32, u32) {
         let w = 16 + taglie.iter().sum::<u32>() + 8 * (taglie.len() as u32 - 1);
         let riga = 16 + 256 + 8;
@@ -345,10 +345,10 @@ mod tests {
         (tela, w, h)
     }
 
-    // --- PNG (deflate con blocchi "stored": niente dipendenze) ------------
+    // --- PNG (deflate with "stored" blocks: no dependencies) ------------
 
     fn scrivi_png(path: &Path, rgba: &[u8], w: u32, h: u32) {
-        // Filtro "None" su ogni riga, poi zlib con blocchi non compressi.
+        // "None" filter on each row, then zlib with uncompressed blocks.
         let mut grezzo = Vec::with_capacity((w * h * 4 + h) as usize);
         for y in 0..h {
             grezzo.push(0);
@@ -372,7 +372,7 @@ mod tests {
         let mut ihdr = Vec::new();
         ihdr.extend(&w.to_be_bytes());
         ihdr.extend(&h.to_be_bytes());
-        ihdr.extend(&[8, 6, 0, 0, 0]); // 8 bit, RGBA
+        ihdr.extend(&[8, 6, 0, 0, 0]); // 8-bit, RGBA
         blocco_png(&mut out, b"IHDR", &ihdr);
         blocco_png(&mut out, b"IDAT", &idat);
         blocco_png(&mut out, b"IEND", &[]);

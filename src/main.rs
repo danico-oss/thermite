@@ -156,7 +156,7 @@ impl ProjectApp {
 
 impl eframe::App for ProjectApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Scala compatta, adatta anche agli schermi dei notebook.
+        // Compact scale, also suited to laptop screens.
         ctx.set_pixels_per_point(1.0);
 
         if !self.theme_applied {
@@ -167,8 +167,8 @@ impl eframe::App for ProjectApp {
         let dark_mode = self.view_state.dark_mode;
         let mut cmd: Option<Command> = None;
 
-        // --- Barra dei menu + barra multifunzione ---
-        // Lo sfondo segue il tema: chiaro in tema chiaro, scuro in tema scuro.
+        // --- Menu bar + ribbon bar ---
+        // The background follows the theme: light in light theme, dark in dark theme.
         let top_frame = egui::Frame::new()
             .fill(theme::ribbon_bg(dark_mode))
             .inner_margin(egui::Margin {
@@ -185,7 +185,7 @@ impl eframe::App for ProjectApp {
                 }
             });
 
-        // --- Barra di stato ---
+        // --- Status bar ---
         let bottom_frame = egui::Frame::new()
             .fill(theme::ribbon_bg(dark_mode))
             .inner_margin(egui::Margin {
@@ -200,7 +200,7 @@ impl eframe::App for ProjectApp {
                 views::ribbon::show_status_bar(ui, &self.view_state, self.projects.len());
             });
 
-        // --- Area centrale ---
+        // --- Central area ---
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(4.0);
 
@@ -239,8 +239,8 @@ impl eframe::App for ProjectApp {
         self.view_state.show_map_preview_window(ctx);
     }
 
-    /// Colore di fondo della finestra: segue il tema, così eventuali aree
-    /// trasparenti non mostrano il grigio scuro predefinito di eframe.
+    /// Window background color: follows the theme, so that any transparent
+    /// areas do not show eframe's default dark gray.
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         theme::panel_bg(self.view_state.dark_mode).to_normalized_gamma_f32()
     }

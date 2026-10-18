@@ -1,9 +1,9 @@
-//! Scheda "Sensori 3D": parallelepipedo ruotabile su cui posizionare i sensori
-//! del progetto, con anteprima ed esportazione in PDF della visualizzazione.
+//! "3D Sensors" tab: a rotatable parallelepiped on which to place the project's
+//! sensors, with preview and PDF export of the visualization.
 //!
-//! Le posizioni sono salvate nel database SQLite (tabella `sensor_positions`),
-//! una per progetto e per sensore: lo stesso sensore non può essere posizionato
-//! due volte (vincolo applicato sia nell'interfaccia sia nel database).
+//! Positions are saved in the SQLite database (table `sensor_positions`),
+//! one per project and per sensor: the same sensor cannot be placed
+//! twice (a constraint enforced both in the interface and in the database).
 
 use crate::data;
 use crate::i18n::{self, Language};
@@ -15,7 +15,7 @@ use eframe::egui::{
     self, Color32, CornerRadius, FontId, Rect, RichText, Stroke, StrokeKind, Vec2,
 };
 
-/// Dati dell'anteprima PDF della mappa (restano in memoria finché è aperta).
+/// Data of the map's PDF preview (they stay in memory as long as it is open).
 pub struct MapPreview {
     pub project: Project,
     pub dims: SceneDims,
@@ -26,7 +26,7 @@ pub struct MapPreview {
     pub stats: Vec<(String, f32, f32)>,
 }
 
-/// Colori usati dal disegno della scena (schermo o carta).
+/// Colors used by the scene drawing (screen or paper).
 struct MapStyle {
     bg: Color32,
     face: Color32,
@@ -35,11 +35,11 @@ struct MapStyle {
     label_fg: Color32,
 }
 
-/// Stile per la vista interattiva, coerente con il tema chiaro/scuro.
+/// Style for the interactive view, consistent with the light/dark theme.
 ///
-/// Il container è reso semitrasparente, così i sensori (anche su facce lontane)
-/// restano visibili: ogni faccia è un grigio con canale alfa ridotto, disegnata
-/// dal fondo verso la telecamera.
+/// The container is rendered semi-transparent, so that the sensors (even on
+/// far faces) stay visible: each face is a gray with a reduced alpha channel,
+/// drawn from the background toward the camera.
 fn screen_style(dark: bool) -> MapStyle {
     if dark {
         MapStyle {
@@ -60,7 +60,7 @@ fn screen_style(dark: bool) -> MapStyle {
     }
 }
 
-/// Stile "carta" per l'anteprima del PDF (opaco: rappresenta il foglio stampato).
+/// "Paper" style for the PDF preview (opaque: it represents the printed sheet).
 fn paper_style() -> MapStyle {
     MapStyle {
         bg: Color32::from_rgb(0xFA, 0xFA, 0xFA),
@@ -71,7 +71,7 @@ fn paper_style() -> MapStyle {
     }
 }
 
-/// Minimo e massimo di ogni sensore ricavati dalle serie del file dati.
+/// Minimum and maximum of each sensor derived from the data file series.
 fn sensor_stats(series: &[data::Series]) -> Vec<(String, f32, f32)> {
     series
         .iter()
@@ -91,15 +91,15 @@ fn sensor_stats(series: &[data::Series]) -> Vec<(String, f32, f32)> {
         .collect()
 }
 
-/// Moltiplica un colore per un fattore di luce (0..1), conservando l'alfa
-/// (necessario per il container semitrasparente).
+/// Multiplies a color by a light factor (0..1), preserving the alpha
+/// (needed for the semi-transparent container).
 fn shade(c: Color32, k: f32) -> Color32 {
     let f = |v: u8| (v as f32 * k).clamp(0.0, 255.0) as u8;
     Color32::from_rgba_unmultiplied(f(c.r()), f(c.g()), f(c.b()), c.a())
 }
 
 impl ViewState {
-    /// Disegna la scheda "Sensori 3D".
+    /// Draws the "Sensors 3D" tab.
     pub fn show_map_ui(&mut self, ui: &mut egui::Ui, db: &crate::models::Database) {
         let dark = ui.visuals().dark_mode;
         let lang = self.lang;
@@ -128,15 +128,15 @@ impl ViewState {
             return;
         };
 
-        // Carica layout e posizioni dal database quando cambia il progetto attivo.
+        // Loads layout and positions from the database when the active project changes.
         if self.map_loaded_for != Some(proj.id) {
             self.map_dims = db.load_scene_dims(proj.id).unwrap_or_default().sanitized();
             self.map_positions = db.load_sensor_positions(proj.id);
             self.map_selected = None;
-            // Un eventuale trascinamento in corso apparteneva al progetto prima.
+            // Any drag in progress belonged to the previous project.
             self.map_dragging = None;
-            // Le visibilità sono una preferenza di sessione: al cambio
-            // progetto tutti i sensori tornano visibili.
+            // Visibility is a session preference: when the project
+            // changes, all sensors become visible again.
             self.map_hidden.clear();
             let cam = Camera::default();
             self.map_yaw = cam.yaw;
@@ -145,21 +145,21 @@ impl ViewState {
             self.map_loaded_for = Some(proj.id);
         }
 
-        // Sensori disponibili e loro estremi termici, dal file dati del progetto.
+        // Available sensors and their thermal extremes, from the project's data file.
         if self.csv_rows.is_empty() && self.csv_load_error.is_none() {
             self.load_data_file();
         }
         let series = data::parse_series(&self.csv_headers, &self.csv_rows);
         let stats = sensor_stats(&series);
 
-        // --- Copie locali manipolate dalla UI, applicate a fine frame ---
+        // --- Local copies manipulated by the UI, applied at the end of the frame ---
         let mut dims = self.map_dims;
         let mut yaw = self.map_yaw;
         let mut pitch = self.map_pitch;
         let mut zoom = self.map_zoom;
         let mut positions = self.map_positions.clone();
         let mut selected = self.map_selected.clone();
-        // Sensori nascosti dal diagramma, modificabili dall'occhio in lista.
+        // Sensors hidden from the diagram, toggled by the eye in the list.
         let mut hidden = self.map_hidden.clone();
 
         let mut dims_changed = false;
@@ -169,16 +169,16 @@ impl ViewState {
         let mut reset_view = false;
         let mut open_preview = false;
 
-        // --- Trascinamento di un punto già posizionato ---
-        // Comincia premendo su un punto esistente e finisce col rilascio del
-        // bottone: finché `dragging` è imposto il canvas non ruota la scena.
+        // --- Dragging an already placed point ---
+        // Starts by pressing on an existing point and ends when the button is
+        // released: as long as `dragging` is set the canvas does not rotate the scene.
         let mut dragging: Option<String> = self.map_dragging.clone();
-        // Le nuove coordinate uscite dalle closure, da scrivere a fine frame.
+        // The new coordinates coming out of the closures, to be written at frame end.
         let mut drag_moved: Option<(String, scene3d::Vec3)> = None;
-        // Nome del sensore rilasciato: in quel momento la posizione va salvata.
+        // Name of the released sensor: at that moment the position must be saved.
         let mut drag_release: Option<String> = None;
 
-        // --- Barra dei comandi ---
+        // --- Command bar ---
         theme::card(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
@@ -249,7 +249,7 @@ impl ViewState {
         let body_h = avail.y.max(320.0);
 
         ui.horizontal_top(|ui| {
-            // ------------------- Pannello sinistro: controlli -------------------
+            // ------------------- Left panel: controls -------------------
             ui.allocate_ui_with_layout(
                 Vec2::new(left_w, body_h),
                 egui::Layout::top_down(egui::Align::Min),
@@ -317,12 +317,12 @@ impl ViewState {
                                 ),
                             );
                         } else {
-                            // Il suggerimento sta sopra la lista perché la lista
-                            // deve poter occupare a ogni frame tutto lo spazio che
-                            // resta nella card: così la sua altezza si deduce
-                            // dall'ultima posizione raggiunta dal layout, senza
-                            // costanti magiche che, al ridursi della finestra,
-                            // finiscono per tagliarla fuori.
+                            // The hint goes above the list because the list
+                            // must be able to occupy, at every frame, all the space that
+                            // remains in the card: this way its height is deduced
+                            // from the last position reached by the layout, without
+                            // magic constants that, as the window shrinks,
+                            // end up cutting it off.
                             theme::hint(
                                 ui,
                                 i18n::t(
@@ -332,9 +332,9 @@ impl ViewState {
                             );
                             ui.add_space(4.0);
 
-                            // Tutto ciò che resta: se i sensori non ci stanno, la
-                            // barra di scorrimento compare e la lista scorre in
-                            // verticale; se ci stanno, riempie esattamente la card.
+                            // Everything that remains: if the sensors do not fit, the
+                            // scroll bar appears and the list scrolls
+                            // vertically; if they fit, it fills exactly the card.
                             let list_h = ui.available_height().max(96.0);
                             egui::ScrollArea::vertical()
                                 .max_height(list_h)
@@ -347,9 +347,9 @@ impl ViewState {
                                         ui.horizontal(|ui| {
                                             let is_sel =
                                                 selected.as_deref() == Some(name.as_str());
-                                            // Il nome mantiene il colore del testo (o verde se già
-                                            // posizionato): la selezione è indicata solo da una
-                                            // cornice, così il nome resta sempre leggibile.
+                                            // The name keeps the text color (or green if already
+                                            // placed): the selection is shown only by a
+                                            // frame, so that the name always stays legible.
                                             let mut txt = RichText::new(name).size(11.5);
                                             txt = if is_placed {
                                                 txt.color(theme::OK)
@@ -387,10 +387,10 @@ impl ViewState {
                                                         egui::Align::Center,
                                                     ),
                                                     |ui| {
-                                                        // Con layout destra-sinistra il primo
-                                                        // widget occupa l'estrema destra: la
-                                                        // rimozione resta dov'era e l'occhio
-                                                        // le sta subito accanto.
+                                                        // With a right-to-left layout the first
+                                                        // widget takes up the far right: removal
+                                                        // stays where it was and the eye
+                                                        // sits right next to it.
                                                         if ui
                                                             .small_button("×")
                                                             .on_hover_text(i18n::t(
@@ -442,7 +442,7 @@ impl ViewState {
 
             ui.separator();
 
-            // ------------------- Canvas 3D -------------------
+            // ------------------- 3D canvas -------------------
             let w = ui.available_width().max(200.0);
             ui.allocate_ui_with_layout(
                 Vec2::new(w, body_h),
@@ -460,11 +460,11 @@ impl ViewState {
                         dims,
                     );
 
-                    // --- Trascinamento di un punto già posizionato ---
-                    // Si aggancia solo se, quando il trascinamento comincia, il
-                    // cursore è ancora entro l'area del punto (14 px): così si
-                    // afferra il punto che si ha sotto le dita, mentre la scena
-                    // comincia a ruotare soltanto premendo a vuoto.
+                    // --- Dragging an already placed point ---
+                    // It engages only if, when the drag begins, the
+                    // cursor is still inside the point's area (14 px): this way it
+                    // grabs the point you have under your fingers, while the scene
+                    // starts rotating only when pressing on empty space.
                     if response.drag_started() {
                         if let Some(pos) = response.interact_pointer_pos() {
                             if let Some(name) =
@@ -476,11 +476,11 @@ impl ViewState {
                     }
 
                     if let Some(name) = dragging.clone() {
-                        // Il punto scorre nel piano parallelo alla visuale che
-                        // passa per lui: arriva esattamente dove si punta e,
-                        // se la telecamera guarda da tre quarti, si sposta con
-                        // componenti su x, y e z insieme. Non viene riportato su
-                        // nessuna parete, quindi può staccarsi dal container.
+                        // The point slides in the plane parallel to the view that
+                        // passes through it: it arrives exactly where you point and,
+                        // if the camera looks from a three-quarter angle, it moves with
+                        // x, y and z components together. It is not snapped back onto
+                        // any wall, so it can detach from the container.
                         if let Some(p) = positions.iter_mut().find(|p| p.name == name) {
                             if let Some(ptr) = response.interact_pointer_pos() {
                                 let punto = scene3d::sensor_point(p, dims);
@@ -495,7 +495,7 @@ impl ViewState {
                             dragging = None;
                         }
                     } else if response.dragged() {
-                        // Rotazione: trascinamento con il tasto sinistro.
+                        // Rotation: drag with the left button.
                         let d = response.drag_delta();
                         yaw += d.x * 0.01;
                         pitch = (pitch + d.y * 0.01).clamp(-1.45, 1.45);
@@ -515,7 +515,7 @@ impl ViewState {
                         &style,
                     );
 
-                    // Zoom con la rotella.
+                    // Zoom with the wheel.
                     if response.hovered() {
                         let scroll = ui.input(|i| i.smooth_scroll_delta.y);
                         if scroll.abs() > 0.0 {
@@ -527,8 +527,8 @@ impl ViewState {
                             egui::CursorIcon::Grab
                         });
                     }
-                    // Posizionamento: clic su una faccia. Mentre un punto è in
-                    // mano il clic non posiziona nulla.
+                    // Placement: click on a face. While a point is in
+                    // hand the click places nothing.
                     if response.clicked() && dragging.is_none() {
                         if let Some(pos) = response.interact_pointer_pos() {
                             let (o, d) = proj.unproject(pos.x, pos.y);
@@ -537,7 +537,7 @@ impl ViewState {
                             }
                         }
                     }
-                    // Rimozione: clic con il tasto destro su un punto esistente.
+                    // Removal: right-click on an existing point.
                     if response.secondary_clicked() {
                         if let Some(pos) = response.interact_pointer_pos() {
                             if let Some(name) =
@@ -551,27 +551,27 @@ impl ViewState {
             );
         });
 
-        // ------------------- Applica le modifiche -------------------
+        // ------------------- Apply the changes -------------------
         self.map_dims = dims.sanitized();
         self.map_yaw = yaw;
         self.map_pitch = pitch;
         self.map_zoom = zoom;
         self.map_selected = selected;
-        // Il trascinamento continua da un frame all'altro finché non si
-        // rilascia il bottone.
+        // The drag continues from one frame to the next until the
+        // button is released.
         self.map_dragging = dragging;
-        // Stato dell'occhio della lista (solo sessione).
+        // State of the list's eye (session only).
         self.map_hidden = hidden.clone();
 
-        // Posizione aggiornata durante il trascinamento: prima la si scrive nella
-        // lista, così il frame successivo riparte da qui.
+        // Position updated during the drag: it is first written into the
+        // list, so that the next frame restarts from here.
         if let Some((name, pos)) = drag_moved {
             if let Some(p) = self.map_positions.iter_mut().find(|p| p.name == name) {
                 p.pos = Some(pos);
             }
         }
-        // Rilascio: la posizione finale passa anche al database, altrimenti
-        // sarebbe persa alla chiusura.
+        // Release: the final position also goes to the database, otherwise
+        // it would be lost on closing.
         if let Some(name) = drag_release {
             if let Some(p) = self.map_positions.iter().find(|p| p.name == name) {
                 let pos = p.clone();
@@ -605,14 +605,14 @@ impl ViewState {
                             face,
                             u,
                             v,
-                            // Ancora incollato alla parete: nessuna posizione
-                            // effettiva finché non viene trascinato.
+                            // Still glued to the wall: no actual
+                            // position until it is dragged.
                             pos: None,
                         };
                         match db.insert_sensor_position(proj.id, &pos) {
                             Ok(()) => {
                                 self.map_positions.push(pos);
-                                // Dopo il posizionamento il sensore viene deselezionato.
+                                // After placement the sensor is deselected.
                                 self.map_selected = None;
                                 self.set_status(
                                     format!("{} {name}", i18n::t(lang, "Sensore posizionato:")),
@@ -661,7 +661,7 @@ impl ViewState {
         }
     }
 
-    /// Riporta la telecamera della mappa all'inquadratura iniziale.
+    /// Brings the map camera back to the initial framing.
     pub fn reset_map_view(&mut self) {
         let cam = Camera::default();
         self.map_yaw = cam.yaw;
@@ -670,7 +670,7 @@ impl ViewState {
         self.set_status(i18n::t(self.lang, "Vista reimpostata."), false);
     }
 
-    /// Prepara l'anteprima PDF della mappa dei sensori.
+    /// Prepares the PDF preview of the sensors map.
     pub fn open_map_preview(&mut self) {
         let lang = self.lang;
         let Some(project) = self.active_project.clone() else {
@@ -698,8 +698,8 @@ impl ViewState {
             return;
         }
 
-        // L'anteprima e il PDF ritraggono la scena così come appare a schermo:
-        // i sensori spenti dall'occhio non compaiono nemmeno lì.
+        // The preview and the PDF portray the scene just as it appears on screen:
+        // sensors turned off by the eye do not appear there either.
         let visibili: Vec<SensorPos> = self
             .map_positions
             .iter()
@@ -729,7 +729,7 @@ impl ViewState {
         self.set_status(i18n::t(lang, "Anteprima mappa pronta: controlla e salva."), false);
     }
 
-    /// Disegna la finestra di anteprima della mappa (se aperta).
+    /// Draws the map preview window (if open).
     pub fn show_map_preview_window(&mut self, ctx: &egui::Context) {
         let Some(preview) = self.map_preview.take() else {
             return;
@@ -803,9 +803,9 @@ impl ViewState {
     }
 }
 
-/// Trova il sensore più vicino (in pixel) a un punto cliccato, entro una soglia.
-/// I sensori nascosti non vengono considerati: non si afferrano, non si
-/// trascinano e non si rimuovono col tasto destro finché sono spenti.
+/// Finds the sensor closest (in pixels) to a clicked point, within a threshold.
+/// Hidden sensors are not considered: they are not grabbed, they are not
+/// dragged and they are not removed with the right button while they are off.
 fn nearest_marker(
     pos: egui::Pos2,
     rect: Rect,
@@ -838,7 +838,7 @@ fn nearest_marker(
     best.map(|(_, n)| n.to_string())
 }
 
-/// Disegna la scena 3D (parallelepipedo + sensori) dentro `rect`.
+/// Draws the 3D scene (parallelepiped + sensors) inside `rect`.
 fn draw_scene(
     painter: &egui::Painter,
     rect: Rect,
@@ -863,7 +863,7 @@ fn draw_scene(
         dims,
     );
 
-    // Facce, dal fondo verso la telecamera.
+    // Faces, from the background toward the camera.
     for q in scene3d::face_quads(&proj, dims) {
         let pts: Vec<egui::Pos2> = q.pts.iter().map(|(x, y)| egui::pos2(*x, *y)).collect();
         painter.add(egui::Shape::convex_polygon(
@@ -873,9 +873,9 @@ fn draw_scene(
         ));
     }
 
-    // Sensori con nome e temperature minima/massima. I sensori nascosti
-    // vengono saltati, ma l'indice della serie resta quello della lista
-    // completa: il colore di un sensore non cambia nascondendone un altro.
+    // Sensors with name and minimum/maximum temperatures. Hidden sensors
+    // are skipped, but the series index remains the one of the full
+    // list: a sensor's color does not change by hiding another one.
     for (i, p) in positions.iter().enumerate() {
         if hidden.contains(&p.name) {
             continue;
@@ -895,7 +895,7 @@ fn draw_scene(
     }
 }
 
-/// Etichetta con nome del sensore e temperature minima/massima.
+/// Label with the sensor name and minimum/maximum temperatures.
 fn draw_label(
     painter: &egui::Painter,
     anchor: egui::Pos2,
@@ -927,7 +927,7 @@ fn draw_label(
     painter.galley(anchor + Vec2::new(0.0, name_h), temp_g, style.label_fg);
 }
 
-/// Disegna la pagina A4 dell'anteprima, replicando il layout del PDF.
+/// Draws the A4 page of the preview, replicating the PDF layout.
 fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang: Language) {
     use crate::export::{BOTTOM, LEFT, RIGHT, TOP};
 
@@ -946,7 +946,7 @@ fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang
     let muted_c = Color32::from_rgb(0x70, 0x70, 0x70);
     let accent = Color32::from_rgb(0x21, 0x73, 0x46);
 
-    // Foglio
+    // Sheet
     painter.rect_filled(page, CornerRadius::ZERO, Color32::WHITE);
     painter.rect_stroke(
         page,
@@ -955,7 +955,7 @@ fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang
         StrokeKind::Inside,
     );
 
-    // Intestazione
+    // Header
     painter.text(
         mm(LEFT, 199.0),
         egui::Align2::LEFT_BOTTOM,
@@ -1005,8 +1005,8 @@ fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang
         muted_c,
     );
 
-    // Area della scena. Le posizioni del preview sono già state filtrate
-    // all'apertura dell'anteprima, quindi qui nessuno sensor è escluso.
+    // Scene area. The preview positions have already been filtered
+    // when the preview was opened, so no sensor is excluded here.
     let area = Rect::from_two_pos(mm(LEFT, BOTTOM), mm(RIGHT, TOP));
     draw_scene(
         painter,
@@ -1021,7 +1021,7 @@ fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang
         &paper_style(),
     );
 
-    // Piè di pagina
+    // Footer
     painter.text(
         mm(LEFT, 11.0),
         egui::Align2::LEFT_BOTTOM,
@@ -1035,10 +1035,10 @@ fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang
 mod tests {
     use super::*;
 
-    /// Un sensore spento dall'occhio scompare anche dalle interazioni: mentre
-    /// è nascosto non si afferra col puntatore (quindi né selezione, né
-    /// trascinamento, né rimozione col tasto destro), e torna disponibile
-    /// appena lo si rimostra.
+    /// A sensor turned off by the eye also disappears from the interactions:
+    /// while it is hidden it is not grabbed with the pointer (so neither selection,
+    /// nor dragging, nor removal with the right button), and it becomes available
+    /// again as soon as it is shown again.
     #[test]
     fn nearest_marker_ignora_i_sensori_nascosti() {
         let dims = SceneDims {
@@ -1065,7 +1065,7 @@ mod tests {
         }];
         let (x, y) = proiettore.project(scene3d::sensor_point(&posizioni[0], dims));
 
-        // Nessun sensore nascosto: il punto si afferra esattamente.
+        // No hidden sensor: the point is grabbed exactly.
         let nessuno = std::collections::BTreeSet::new();
         assert_eq!(
             nearest_marker(
@@ -1081,7 +1081,7 @@ mod tests {
             Some("S1".to_string()),
         );
 
-        // Nascosto: il punto smette di rispondere al puntatore.
+        // Hidden: the point stops responding to the pointer.
         let nascosti: std::collections::BTreeSet<String> =
             ["S1".to_string()].into_iter().collect();
         assert_eq!(

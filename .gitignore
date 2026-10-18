@@ -1,16 +1,16 @@
-# Compilati
+# Build artifacts
 /target
 
-# Dati e preferenze locali (non fanno parte del codice sorgente)
+# Local data and preferences (not part of the source code)
 advanced_projects.db
 advanced_projects.db-*
 thermite_settings.txt
 
-# File di prova personale: l'archivio di esempio versionato è
-# data/dati_fasulli_17-10-2026.csv
+# Personal test file: the versioned example archive is
+# data/example_data.csv
 data/test.csv
 
-# File estranei / duplicati lasciati nella cartella di lavoro
+# Foreign / duplicate files left in the working directory
 Novo Documento de Texto.txt
 data/Novo Documento de Texto.txt
 src/views/chart - Copia.rs

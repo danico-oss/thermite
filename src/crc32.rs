@@ -1,16 +1,16 @@
-//! CRC32 (polinomio IEEE 802.3, lo stesso di zip/PNG) dei file dati.
+//! CRC32 (IEEE 802.3 polynomial, the same one as zip/PNG) of the data files.
 //!
-//! Serve a rilevare se il file dati di un progetto è stato modificato dopo il
-//! salvataggio: il codice calcolato al momento del salvataggio viene tenuto nel
-//! database (`projects.data_crc32`) e confrontato prima di caricare i dati.
+//! It serves to detect whether a project's data file has been modified after
+//! being saved: the code computed at save time is kept in the database
+//! (`projects.data_crc32`) and compared before loading the data.
 //!
-//! Implementazione a tabella (32 voci) senza dipendenze esterne.
+//! Table-based implementation (32 entries) with no external dependencies.
 
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-/// Tabella dei rimanenti, costruita una sola volta a runtime.
+/// Remainder table, built only once at runtime.
 fn tabella() -> [u32; 256] {
     let mut t = [0u32; 256];
     for (i, v) in t.iter_mut().enumerate() {
@@ -23,16 +23,16 @@ fn tabella() -> [u32; 256] {
     t
 }
 
-/// Registro iniziale dello standard CRC-32 (poi finalizzato con XOR finale).
+/// Initial register of the CRC-32 standard (later finalized with the final XOR).
 const INIZIALE: u32 = 0xFFFF_FFFF;
-/// Maschera di finalizzazione dello standard CRC-32.
+/// Finalization mask of the CRC-32 standard.
 const FINALE: u32 = 0xFFFF_FFFF;
 
-/// Continua il CRC da un registro intermedio: è il registro _grezzo_, senza la
-/// finalizzazione, quindi va passato a `finale()` solo all'ultimo blocco.
+/// Continues the CRC from an intermediate register: it is the _raw_ register,
+/// without the finalization, so pass it to `finale()` only on the last block.
 ///
-/// Il valore di partenza è `INIZIALE`, non `0`: concatenare i pezzi di un file
-/// produce lo stesso risultato del file intero.
+/// The starting value is `INIZIALE`, not `0`: concatenating the pieces of a file
+/// produces the same result as the whole file.
 pub fn bytes_con(parziale: u32, dati: &[u8]) -> u32 {
     let t = tabella();
     let mut c = parziale;
@@ -42,14 +42,14 @@ pub fn bytes_con(parziale: u32, dati: &[u8]) -> u32 {
     c
 }
 
-/// Applica l'inversione finale dello standard a un registro grezzo.
+/// Applies the standard's final inversion to a raw register.
 fn finale(registro: u32) -> u32 {
     registro ^ FINALE
 }
 
-/// CRC32 di un file, letto a blocchi (funziona anche su file grandi).
+/// CRC32 of a file, read in blocks (it also works on large files).
 ///
-/// Restituisce `None` se il file non esiste o non è leggibile.
+/// Returns `None` if the file does not exist or is not readable.
 pub fn file(percorso: impl AsRef<Path>) -> Option<u32> {
     let mut f = File::open(percorso).ok()?;
     let mut buf = vec![0u8; 64 * 1024];
@@ -64,16 +64,16 @@ pub fn file(percorso: impl AsRef<Path>) -> Option<u32> {
     Some(finale(c))
 }
 
-/// Formatta un CRC come stringa esadecimale maiuscola a 8 cifre.
+/// Formats a CRC as an 8-digit uppercase hexadecimal string.
 pub fn esadecimale(crc: u32) -> String {
     format!("{crc:08X}")
 }
 
-/// CRC32 di un file come stringa esadecimale, o `None` se non leggibile.
+/// CRC32 of a file as a hexadecimal string, or `None` if it is not readable.
 ///
-/// Usato al salvataggio del progetto: `None` viene scritto come `NULL` nel
-/// database, quindi la verifica in fase di caricamento viene semplicemente
-/// saltata (comportamento di prima).
+/// Used when saving the project: `None` is written as `NULL` in the
+/// database, so the check at load time is simply skipped (the previous
+/// behavior).
 pub fn file_hex(percorso: impl AsRef<Path>) -> Option<String> {
     file(percorso).map(esadecimale)
 }
@@ -82,13 +82,13 @@ pub fn file_hex(percorso: impl AsRef<Path>) -> Option<String> {
 mod tests {
     use super::*;
 
-    /// CRC32 di un buffer di byte, usando lo stesso flusso di `file()`.
+    /// CRC32 of a byte buffer, using the same flow as `file()`.
     fn bytes(dati: &[u8]) -> u32 {
         finale(bytes_con(INIZIALE, dati))
     }
 
-    /// I valori noti di riferimento per lo standard CRC-32 (polinomio
-    /// 0xEDB88320): gli stessi che restituiscono zlib, PNG e zip.
+    /// The known reference values for the CRC-32 standard (polynomial
+    /// 0xEDB88320): the same ones returned by zlib, PNG and zip.
     #[test]
     fn valori_di_riferimento() {
         assert_eq!(bytes(b""), 0x0000_0000);
@@ -97,7 +97,7 @@ mod tests {
         assert_eq!(bytes(b"Thermite"), 0x2FFD_FBC5);
     }
 
-    /// La frammentazione del flusso non deve cambiare il risultato.
+    /// Splitting the stream into chunks must not change the result.
     #[test]
     fn indipendente_dai_blocchi() {
         let dati = b"0123456789abcdef0123456789abcdef";
@@ -109,7 +109,7 @@ mod tests {
         assert_eq!(finale(parziale), intero);
     }
 
-    /// Il CRC di un file temporaneo coincide con quello del suo contenuto.
+    /// The CRC of a temporary file matches that of its content.
     #[test]
     fn file_tempaneo() {
         let dir = std::env::var("TEMP").unwrap_or_else(|_| ".".to_string());
@@ -122,7 +122,7 @@ mod tests {
         let _ = std::fs::remove_file(&p);
     }
 
-    /// Un file più grande di un blocco (64 KiB) viene letto per intero.
+    /// A file larger than one block (64 KiB) is read in full.
     #[test]
     fn file_grande_oltre_un_blocco() {
         let dir = std::env::var("TEMP").unwrap_or_else(|_| ".".to_string());
@@ -133,14 +133,14 @@ mod tests {
         let _ = std::fs::remove_file(&p);
     }
 
-    /// Un percorso inesistente produce `None`, non un panic.
+    /// A nonexistent path produces `None`, not a panic.
     #[test]
     fn percorso_assente() {
         assert_eq!(file("C:\\percorso\\inesistente\\thermite.csv"), None);
         assert_eq!(file_hex("C:\\percorso\\inesistente\\thermite.csv"), None);
     }
 
-    /// L'esadecimale ha sempre otto cifre, con lo zero iniziale.
+    /// The hexadecimal always has eight digits, with the leading zero.
     #[test]
     fn esadecimale_otto_cifre() {
         assert_eq!(esadecimale(0x0000_000A), "0000000A");

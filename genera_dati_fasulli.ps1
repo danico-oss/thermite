@@ -1,18 +1,18 @@
-# Genera l'archivio di dati fasulli usato come esempio da Thermite.
+# Generates the fake data archive used as an example by Thermite.
 #
-# Data unica: 17/10/2026. Un registro per ora, da 00:00:00 a 24:00:00
-# (25 righe: la mezzanotte finale chiude la giornata, come in ISO 8601).
-# Quattro sensori con valori casuali fra 2 e 8 gradi.
+# Single date: 17/10/2026. One record per hour, from 00:00:00 to 24:00:00
+# (25 rows: the final midnight closes the day, as in ISO 8601).
+# Four sensors with random values between 2 and 8 degrees.
 #
-# Il separatore e la virgola decimale sono quelli di un archivio europeo,
-# così il file serve anche a provare il rilevamento automatico del
-# separatore.
+# The separator and the decimal comma are those of a European archive,
+# so the file also serves to test the automatic detection of the
+# separator.
 #
-# Seme fisso: rigenerando il file si ottiene sempre lo stesso contenuto,
-# altrimenti ogni esecuzione riscriverebbe il file e creerebbe differenze
-# inutili nel repository.
+# Fixed seed: regenerating the file always yields the same content,
+# otherwise every run would rewrite the file and create useless
+# differences in the repository.
 #
-# Uso:
+# Usage:
 #   powershell -ExecutionPolicy Bypass -File .\genera_dati_fasulli.ps1
 
 param(
@@ -24,26 +24,26 @@ param(
     [string]$Data = "17/10/2026"
 )
 
-# Percorso di default accanto a questo script, così funziona da qualunque
-# cartella di lavoro.
+# Default path next to this script, so it works from any
+# working directory.
 if ([string]::IsNullOrWhiteSpace($Uscita)) {
     $cartella = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $Uscita = Join-Path $cartella "data\dati_fasulli_17-10-2026.csv"
+    $Uscita = Join-Path $cartella "data\example_data.csv"
 }
 
 $rng = New-Object System.Random($Seme)
 
-# Intestazione: colonna 1 data, colonna 2 ora, poi una serie per sensore.
+# Header: column 1 date, column 2 time, then one series per sensor.
 $nomi = @("Data", "Ora") + (1..$Sensori | ForEach-Object { "Sensore_$_" })
 $righe = New-Object System.Collections.Generic.List[string]
 $righe.Add(($nomi -join ";"))
 
-# 0..24 = 25 registrazioni, comprende sia 00:00:00 sia 24:00:00.
+# 0..24 = 25 records, includes both 00:00:00 and 24:00:00.
 foreach ($h in 0..24) {
     $ora = "{0:D2}:00:00" -f $h
     $valori = for ($s = 0; $s -lt $Sensori; $s++) {
         $v = $Min + ($rng.NextDouble() * ($Max - $Min))
-        # Virgola decimale, come negli archivi europei.
+        # Decimal comma, as in European archives.
         ("{0:F1}" -f $v).Replace('.', ',')
     }
     $righe.Add((@($Data, $ora) + $valori) -join ";")
