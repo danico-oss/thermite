@@ -452,19 +452,22 @@ pub fn big_button_state(
     let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click());
     let painter = ui.painter();
 
+    // Lo stato attivo ("Punti" e "Legenda" della barra comandi) è indicato
+    // **solo** dalla cornice, come ogni altra selezione del programma; il
+    // riempimento è riservato ai riscontri transitorii del puntatore.
     let bg = if resp.is_pointer_button_down_on() {
         a.gamma_multiply(0.30)
     } else if resp.hovered() {
         hover_bg(dark)
-    } else if active {
-        a.gamma_multiply(0.16)
     } else {
         Color32::TRANSPARENT
     };
     if bg != Color32::TRANSPARENT {
         painter.rect_filled(rect, CornerRadius::same(5), bg);
     }
-    if resp.hovered() {
+    if active {
+        selection_frame(painter, rect, CornerRadius::same(5), dark);
+    } else if resp.hovered() {
         painter.rect_stroke(
             rect,
             CornerRadius::same(5),

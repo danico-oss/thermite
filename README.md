@@ -14,15 +14,22 @@ mappa 3D interattiva del container con i sensori posizionati sulle facce.
   automatico del formato data/ora.
 - **Griglia dati**: visualizzazione tabellare con scorrimento sia orizzontale
   sia verticale.
+- **Elenco progetti**: elenco con filtro di ricerca; un clic su una riga la
+  seleziona e un doppio clic apre i dati, esattamente come il pulsante
+  "Apri dati" della stessa riga.
 - **Grafici temporali**: una serie per sensore, con tooltip e valori min/max.
 - **Mappa 3D**: parallelepipedo ruotabile che rappresenta il container, con i
   sensori posizionati sulle facce secondo i dati del progetto. Container
-  semitrasparente, selezione dei sensori, anteprima ed export PDF.
+  semitrasparente, selezione dei sensori, anteprima ed export PDF. Un sensore
+  già posizionato si trascina sulla propria faccia, senza cambiarla mai, e la
+  posizione nuova viene salvata sul database al rilascio del bottone.
 - **Integrità dei dati**: al salvataggio del progetto viene calcolato il CRC32
   del file dati; al caricamento il codice viene riverificato e un file
   modificato viene rifiutato.
 - **Interfaccia**: tema chiaro/scuro, stile compatto per notebook, lingue
-  italiano / inglese / portoghese.
+  italiano / inglese / portoghese. La selezione — riga di elenco, voce di
+  lista, linguetta di scheda o pulsante attivo — è sempre e solo una cornice,
+  mai un riempimento: così il testo resta leggibile in entrambi i temi.
 
 ## Formato del file dati
 
