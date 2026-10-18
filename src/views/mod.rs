@@ -68,6 +68,10 @@ pub struct ViewState {
     /// Sensore che si sta trascinando sul canvas (dispare quando il bottone
     /// viene rilasciato). Finché è attivo il canvas non ruota la scena.
     pub map_dragging: Option<String>,
+    /// Sensori posizionati attualmente nascosti sul diagramma, per nome.
+    /// Solo sessione: non viene salvato da nessuna parte e si azzera quando
+    /// si passa a un altro progetto.
+    pub map_hidden: std::collections::BTreeSet<String>,
     pub map_preview: Option<MapPreview>,
 }
 
@@ -104,6 +108,7 @@ impl ViewState {
             map_positions: Vec::new(),
             map_selected: None,
             map_dragging: None,
+            map_hidden: std::collections::BTreeSet::new(),
             map_preview: None,
         }
     }

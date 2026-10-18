@@ -28,6 +28,11 @@ mappa 3D interattiva del container con i sensori posizionati sulle facce.
   posizione nuova viene salvata sul database al rilascio del bottone; per
   rimettere un sensore su una parete basta rimuoverlo (tasto destro sul punto)
   e riposizionarlo col clic.
+  Accanto all'icona di rimozione c'è un **occhio** che nasconde e mostra il
+  sensore nel diagramma: un sensore spento non appare in scena, non si afferra
+  col puntatore e resta escluso anche dall'anteprima e dal PDF, finché non
+  viene rimostrito. La visibilità vale solo per la sessione e si azzera
+  cambiando progetto.
 - **Integrità dei dati**: al salvataggio del progetto viene calcolato il CRC32
   del file dati; al caricamento il codice viene riverificato e un file
   modificato viene rifiutato.

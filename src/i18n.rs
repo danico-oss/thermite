@@ -508,6 +508,14 @@ static EN: &[(&str, &str)] = &[
     ),
     ("Rimuovi questo sensore", "Remove this sensor"),
     (
+        "Nascondi questo sensore dal diagramma",
+        "Hide this sensor from the diagram",
+    ),
+    (
+        "Mostra questo sensore nel diagramma",
+        "Show this sensor in the diagram",
+    ),
+    (
         "Seleziona un sensore e clicca sul parallelepipedo per posizionarlo. Trascina un punto per spostarlo liberamente nello spazio, il fondo per ruotare, la rotella per lo zoom, il tasto destro su un punto per rimuoverlo.",
         "Select a sensor and click on the box to place it. Drag a point to move it freely in space, drag the background to rotate, use the wheel to zoom, right-click a point to remove it.",
     ),
@@ -523,6 +531,10 @@ static EN: &[(&str, &str)] = &[
     (
         "Posiziona almeno un sensore prima di esportare la mappa.",
         "Place at least one sensor before exporting the map.",
+    ),
+    (
+        "Tutti i sensori sono nascosti: mostrane almeno uno per esportare.",
+        "All sensors are hidden: show at least one to export.",
     ),
     (
         "Anteprima mappa pronta: controlla e salva.",
@@ -981,6 +993,14 @@ static PT: &[(&str, &str)] = &[
     ),
     ("Rimuovi questo sensore", "Remover este sensor"),
     (
+        "Nascondi questo sensore dal diagramma",
+        "Ocultar este sensor do diagrama",
+    ),
+    (
+        "Mostra questo sensore nel diagramma",
+        "Mostrar este sensor no diagrama",
+    ),
+    (
         "Seleziona un sensore e clicca sul parallelepipedo per posizionarlo. Trascina un punto per spostarlo liberamente nello spazio, il fondo per ruotare, la rotella per lo zoom, il tasto destro su un punto per rimuoverlo.",
         "Selecione um sensor e clique no paralelepípedo para posicioná-lo. Arraste um ponto para movê-lo livremente no espaço, o fundo para girar, a roda para o zoom, clique com o botão direito em um ponto para removê-lo.",
     ),
@@ -999,6 +1019,10 @@ static PT: &[(&str, &str)] = &[
     (
         "Posiziona almeno un sensore prima di esportare la mappa.",
         "Posicione ao menos um sensor antes de exportar o mapa.",
+    ),
+    (
+        "Tutti i sensori sono nascosti: mostrane almeno uno per esportare.",
+        "Todos os sensores estão ocultos: mostre pelo menos um para exportar.",
     ),
     (
         "Anteprima mappa pronta: controlla e salva.",

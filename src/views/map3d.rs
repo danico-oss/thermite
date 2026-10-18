@@ -135,6 +135,9 @@ impl ViewState {
             self.map_selected = None;
             // Un eventuale trascinamento in corso apparteneva al progetto prima.
             self.map_dragging = None;
+            // Le visibilità sono una preferenza di sessione: al cambio
+            // progetto tutti i sensori tornano visibili.
+            self.map_hidden.clear();
             let cam = Camera::default();
             self.map_yaw = cam.yaw;
             self.map_pitch = cam.pitch;
@@ -156,6 +159,8 @@ impl ViewState {
         let mut zoom = self.map_zoom;
         let mut positions = self.map_positions.clone();
         let mut selected = self.map_selected.clone();
+        // Sensori nascosti dal diagramma, modificabili dall'occhio in lista.
+        let mut hidden = self.map_hidden.clone();
 
         let mut dims_changed = false;
         let mut place: Option<(usize, f32, f32)> = None;
@@ -382,6 +387,10 @@ impl ViewState {
                                                         egui::Align::Center,
                                                     ),
                                                     |ui| {
+                                                        // Con layout destra-sinistra il primo
+                                                        // widget occupa l'estrema destra: la
+                                                        // rimozione resta dov'era e l'occhio
+                                                        // le sta subito accanto.
                                                         if ui
                                                             .small_button("×")
                                                             .on_hover_text(i18n::t(
@@ -391,6 +400,34 @@ impl ViewState {
                                                             .clicked()
                                                         {
                                                             remove = Some(name.clone());
+                                                        }
+                                                        let nascosto = hidden.contains(name);
+                                                        let icona = if nascosto {
+                                                            Icon::EyeOff
+                                                        } else {
+                                                            Icon::Eye
+                                                        };
+                                                        let colore = if nascosto {
+                                                            theme::muted(dark)
+                                                        } else {
+                                                            ui.visuals().text_color()
+                                                        };
+                                                        let occhio =
+                                                            theme::small_icon_button(ui, icona, colore, 18.0);
+                                                        let testo = if nascosto {
+                                                            "Mostra questo sensore nel diagramma"
+                                                        } else {
+                                                            "Nascondi questo sensore dal diagramma"
+                                                        };
+                                                        if occhio
+                                                            .on_hover_text(i18n::t(lang, testo))
+                                                            .clicked()
+                                                        {
+                                                            if nascosto {
+                                                                hidden.remove(name);
+                                                            } else {
+                                                                hidden.insert(name.clone());
+                                                            }
                                                         }
                                                     },
                                                 );
@@ -431,7 +468,7 @@ impl ViewState {
                     if response.drag_started() {
                         if let Some(pos) = response.interact_pointer_pos() {
                             if let Some(name) =
-                                nearest_marker(pos, rect, dims, yaw, pitch, zoom, &positions)
+                                nearest_marker(pos, rect, dims, yaw, pitch, zoom, &positions, &hidden)
                             {
                                 dragging = Some(name);
                             }
@@ -473,6 +510,7 @@ impl ViewState {
                         pitch,
                         zoom,
                         &positions,
+                        &hidden,
                         &stats,
                         &style,
                     );
@@ -503,7 +541,7 @@ impl ViewState {
                     if response.secondary_clicked() {
                         if let Some(pos) = response.interact_pointer_pos() {
                             if let Some(name) =
-                                nearest_marker(pos, rect, dims, yaw, pitch, zoom, &positions)
+                                nearest_marker(pos, rect, dims, yaw, pitch, zoom, &positions, &hidden)
                             {
                                 remove = Some(name);
                             }
@@ -522,6 +560,8 @@ impl ViewState {
         // Il trascinamento continua da un frame all'altro finché non si
         // rilascia il bottone.
         self.map_dragging = dragging;
+        // Stato dell'occhio della lista (solo sessione).
+        self.map_hidden = hidden.clone();
 
         // Posizione aggiornata durante il trascinamento: prima la si scrive nella
         // lista, così il frame successivo riparte da qui.
@@ -658,13 +698,32 @@ impl ViewState {
             return;
         }
 
+        // L'anteprima e il PDF ritraggono la scena così come appare a schermo:
+        // i sensori spenti dall'occhio non compaiono nemmeno lì.
+        let visibili: Vec<SensorPos> = self
+            .map_positions
+            .iter()
+            .filter(|p| !self.map_hidden.contains(&p.name))
+            .cloned()
+            .collect();
+        if visibili.is_empty() {
+            self.set_status(
+                i18n::t(
+                    lang,
+                    "Tutti i sensori sono nascosti: mostrane almeno uno per esportare.",
+                ),
+                true,
+            );
+            return;
+        }
+
         self.map_preview = Some(MapPreview {
             project,
             dims: self.map_dims.sanitized(),
             yaw: self.map_yaw,
             pitch: self.map_pitch,
             zoom: self.map_zoom,
-            positions: self.map_positions.clone(),
+            positions: visibili,
             stats,
         });
         self.set_status(i18n::t(lang, "Anteprima mappa pronta: controlla e salva."), false);
@@ -745,6 +804,8 @@ impl ViewState {
 }
 
 /// Trova il sensore più vicino (in pixel) a un punto cliccato, entro una soglia.
+/// I sensori nascosti non vengono considerati: non si afferrano, non si
+/// trascinano e non si rimuovono col tasto destro finché sono spenti.
 fn nearest_marker(
     pos: egui::Pos2,
     rect: Rect,
@@ -753,6 +814,7 @@ fn nearest_marker(
     pitch: f32,
     zoom: f32,
     positions: &[SensorPos],
+    hidden: &std::collections::BTreeSet<String>,
 ) -> Option<String> {
     let cam = Camera { yaw, pitch, zoom };
     let proj = scene3d::Projector::new(
@@ -764,6 +826,9 @@ fn nearest_marker(
     );
     let mut best: Option<(f32, &str)> = None;
     for p in positions {
+        if hidden.contains(&p.name) {
+            continue;
+        }
         let (x, y) = proj.project(scene3d::sensor_point(p, dims));
         let d = ((x - pos.x).powi(2) + (y - pos.y).powi(2)).sqrt();
         if d <= 14.0 && best.map_or(true, |(bd, _)| d < bd) {
@@ -782,6 +847,7 @@ fn draw_scene(
     pitch: f32,
     zoom: f32,
     positions: &[SensorPos],
+    hidden: &std::collections::BTreeSet<String>,
     stats: &[(String, f32, f32)],
     style: &MapStyle,
 ) {
@@ -807,8 +873,13 @@ fn draw_scene(
         ));
     }
 
-    // Sensori con nome e temperature minima/massima.
+    // Sensori con nome e temperature minima/massima. I sensori nascosti
+    // vengono saltati, ma l'indice della serie resta quello della lista
+    // completa: il colore di un sensore non cambia nascondendone un altro.
     for (i, p) in positions.iter().enumerate() {
+        if hidden.contains(&p.name) {
+            continue;
+        }
         let (x, y) = proj.project(scene3d::sensor_point(p, dims));
         let center = egui::pos2(x, y);
         let color = theme::series_color(i);
@@ -934,7 +1005,8 @@ fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang
         muted_c,
     );
 
-    // Area della scena
+    // Area della scena. Le posizioni del preview sono già state filtrate
+    // all'apertura dell'anteprima, quindi qui nessuno sensor è escluso.
     let area = Rect::from_two_pos(mm(LEFT, BOTTOM), mm(RIGHT, TOP));
     draw_scene(
         painter,
@@ -944,6 +1016,7 @@ fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang
         preview.pitch,
         preview.zoom,
         &preview.positions,
+        &std::collections::BTreeSet::new(),
         &preview.stats,
         &paper_style(),
     );
@@ -956,4 +1029,74 @@ fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang
         FontId::proportional(fs(7.0)),
         muted_c,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Un sensore spento dall'occhio scompare anche dalle interazioni: mentre
+    /// è nascosto non si afferra col puntatore (quindi né selezione, né
+    /// trascinamento, né rimozione col tasto destro), e torna disponibile
+    /// appena lo si rimostra.
+    #[test]
+    fn nearest_marker_ignora_i_sensori_nascosti() {
+        let dims = SceneDims {
+            w: 6.0,
+            h: 2.5,
+            d: 2.4,
+        };
+        let rect = Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(400.0, 300.0));
+        let cam = Camera::default();
+        let proiettore = scene3d::Projector::new(
+            rect.center().x,
+            rect.center().y,
+            rect.width().min(rect.height()),
+            &cam,
+            dims,
+        );
+
+        let posizioni = vec![SensorPos {
+            name: "S1".to_string(),
+            face: 4,
+            u: 0.5,
+            v: 0.5,
+            pos: None,
+        }];
+        let (x, y) = proiettore.project(scene3d::sensor_point(&posizioni[0], dims));
+
+        // Nessun sensore nascosto: il punto si afferra esattamente.
+        let nessuno = std::collections::BTreeSet::new();
+        assert_eq!(
+            nearest_marker(
+                egui::pos2(x, y),
+                rect,
+                dims,
+                cam.yaw,
+                cam.pitch,
+                cam.zoom,
+                &posizioni,
+                &nessuno,
+            ),
+            Some("S1".to_string()),
+        );
+
+        // Nascosto: il punto smette di rispondere al puntatore.
+        let nascosti: std::collections::BTreeSet<String> =
+            ["S1".to_string()].into_iter().collect();
+        assert_eq!(
+            nearest_marker(
+                egui::pos2(x, y),
+                rect,
+                dims,
+                cam.yaw,
+                cam.pitch,
+                cam.zoom,
+                &posizioni,
+                &nascosti,
+            ),
+            None,
+            "un sensore nascosto non deve essere afferrabile"
+        );
+    }
 }

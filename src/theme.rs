@@ -198,6 +198,8 @@ pub enum Icon {
     Points,
     Legend,
     Cube,
+    Eye,
+    EyeOff,
 }
 
 /// Converte coordinate normalizzate (0..1) del rettangolo dell'icona in punti schermo.
@@ -210,6 +212,20 @@ pub fn draw_icon(painter: &egui::Painter, icon: Icon, rect: Rect, color: Color32
     let s = Stroke::new(w, color);
     let line = |a: (f32, f32), b: (f32, f32)| {
         painter.line_segment([n(rect, a.0, a.1), n(rect, b.0, b.1)], s);
+    };
+    // Contorno a mandorla dell'occhio, condiviso dalle due varianti.
+    let mandorla = || {
+        painter.add(egui::Shape::closed_line(
+            vec![
+                n(rect, 0.05, 0.50),
+                n(rect, 0.32, 0.27),
+                n(rect, 0.68, 0.27),
+                n(rect, 0.95, 0.50),
+                n(rect, 0.68, 0.73),
+                n(rect, 0.32, 0.73),
+            ],
+            s,
+        ));
     };
 
     match icon {
@@ -426,6 +442,16 @@ pub fn draw_icon(painter: &egui::Painter, icon: Icon, rect: Rect, color: Color32
             // Faccia laterale destra
             line(ttr, tbr);
             line(br, tbr);
+        }
+        Icon::Eye => {
+            // Occhio aperto: mandorla con la pupilla.
+            mandorla();
+            painter.circle_stroke(n(rect, 0.5, 0.5), rect.width() * 0.15, s);
+        }
+        Icon::EyeOff => {
+            // Occhio sbarrato: la stessa forma attraversata in diagonale.
+            mandorla();
+            line((0.14, 0.86), (0.86, 0.14));
         }
     }
 }
@@ -667,6 +693,28 @@ pub enum ButtonKind {
 }
 
 /// Pulsante d'azione con icona + testo: solido (primario), rosso (pericolo) o neutro.
+/// Piccolo pulsante quadrato con un'icona vettoriale, pensato per le righe di
+/// lista dove serve un'azione di scorrimento (dimensioni e riscontri di
+/// puntatore simili a `Ui::small_button`).
+pub fn small_icon_button(
+    ui: &mut egui::Ui,
+    icon: Icon,
+    color: Color32,
+    size: f32,
+) -> egui::Response {
+    let dark = ui.visuals().dark_mode;
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(size), egui::Sense::click());
+    if resp.hovered() || resp.is_pointer_button_down_on() {
+        ui.painter()
+            .rect_filled(rect, CornerRadius::same(3), hover_bg(dark));
+    }
+    draw_icon(ui.painter(), icon, rect, color, 1.4);
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp
+}
+
 pub fn action_button(
     ui: &mut egui::Ui,
     icon: Icon,
