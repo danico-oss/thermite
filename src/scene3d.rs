@@ -266,34 +266,9 @@ pub fn pick_face(origin: Vec3, dir: Vec3, dims: SceneDims) -> Option<(usize, f32
     })
 }
 
-/// Punto locale sulla faccia **interna** di `face` per coordinate `u`, `v` in
-/// `[0, 1]`.
-///
-/// È la stessa parametrizzazione di [`face_point`] spostata verso l'interno del
-/// volume lungo la normale, in modo che il sensore resti dentro il
-/// parallelepipedo: la distanza dalla parete è una frazione fissa della
-/// dimensione lungo quella normale, così è sempre visibile e non può mai
-/// attraversare il centro del container neppure sui contenitori molto sottili.
-pub fn inner_point(face: usize, u: f32, v: f32, dims: SceneDims) -> Vec3 {
-    /// Frazione della dimensione lungo la normale usata come distacco dalla
-    /// parete. Deve restare minore di 0.5, altrimenti il punto uscirebbe
-    /// dall'altro lato.
-    const DISTACCO: f32 = 0.12;
-    let distacco = match face {
-        0 | 1 => dims.w,
-        2 | 3 => dims.h,
-        _ => dims.d,
-    } * DISTACCO;
-    face_point(face, u, v, dims).add(face_normal(face).scale(-distacco))
-}
-
-/// Posizione 3D (locale) di un sensore salvato, sul lato indicato dal record.
+/// Posizione 3D (locale) di un sensore salvato.
 pub fn sensor_point(pos: &SensorPos, dims: SceneDims) -> Vec3 {
-    if pos.inside {
-        inner_point(pos.face, pos.u, pos.v, dims)
-    } else {
-        face_point(pos.face, pos.u, pos.v, dims)
-    }
+    face_point(pos.face, pos.u, pos.v, dims)
 }
 
 #[cfg(test)]
@@ -352,122 +327,5 @@ mod tests {
         assert_eq!(face, 4);
         assert!((u - 0.4).abs() < 1e-3, "u = {u}");
         assert!((v - 0.7).abs() < 1e-3, "v = {v}");
-    }
-
-    // --- Punto interno ---
-
-    /// Il punto interno deve cadere davvero dentro il volume: strettamente
-    /// entro le metà dimensioni su tutti gli assi, per ogni faccia e ogni
-    /// coppia di coordinate (comprese le estreme).
-    #[test]
-    fn punto_interno_sta_dentro_il_volume() {
-        assert_dentro(&dims());
-    }
-
-    /// Sui contenitori molto sottili il distacco deve comunque restare dentro
-    /// la metà dimensione, altrimenti il sensore sbucerebbe dalla parete
-    /// opposta.
-    #[test]
-    fn punto_interno_non_attraversa_un_container_sottile() {
-        assert_dentro(&SceneDims {
-            w: 6.0,
-            h: 0.5,
-            d: 0.6,
-        });
-    }
-
-    /// Controlla l'invariante su ogni faccia e ogni coppia di coordinate.
-    ///
-    /// Lungo la normale il punto deve essere **strettamente** dentro la parete
-    /// (è quello che fa il distacco). Sulle direzioni parallele basta restare
-    /// entro la scatola: con `u` o `v` all'estremo il punto cade esattamente
-    /// sullo spigolo, e starci è corretto — un sensore fissato nell'angolo
-    /// interno resta dentro.
-    fn assert_dentro(d: &SceneDims) {
-        let (hx, hy, hz) = (d.w * 0.5, d.h * 0.5, d.d * 0.5);
-        for face in 0..FACE_COUNT {
-            for (u, v) in [(0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0), (0.5, 0.5)] {
-                let p = inner_point(face, u, v, *d);
-                // Asse normale (quello che viene arretrato) e due parallele.
-                let (n_p, p1, p2) = match face {
-                    0 | 1 => (p.x, p.y, p.z),
-                    2 | 3 => (p.y, p.x, p.z),
-                    _ => (p.z, p.x, p.y),
-                };
-                let (n_lim, l1, l2) = match face {
-                    0 | 1 => (hx, hy, hz),
-                    2 | 3 => (hy, hx, hz),
-                    _ => (hz, hx, hy),
-                };
-                assert!(
-                    n_p.abs() < n_lim - 1e-6,
-                    "faccia {face} ({u},{v}) non è arretrato dalla parete: {n_p} vs ±{n_lim}"
-                );
-                assert!(
-                    p1.abs() <= l1 + 1e-5 && p2.abs() <= l2 + 1e-5,
-                    "faccia {face} ({u},{v}) fuori dal volume: {:?}",
-                    (p.x, p.y, p.z)
-                );
-            }
-        }
-    }
-
-    /// Il punto interno deve trovarsi sulla stessa faccia (stesso `u`, `v`)
-    /// di quello esterno: cambia solo la distanza dalla parete.
-    #[test]
-    fn punto_interno_conserve_le_coordinate_di_faccia() {
-        let d = dims();
-        for face in 0..FACE_COUNT {
-            for (u, v) in [(0.0, 0.0), (0.3, 0.8), (1.0, 1.0)] {
-                let esterno = face_point(face, u, v, d);
-                let interno = inner_point(face, u, v, d);
-                let (u2, v2) = face_uv(face, interno, d);
-                assert!((u - u2).abs() < 1e-4, "faccia {face}: u {u} -> {u2}");
-                assert!((v - v2).abs() < 1e-4, "faccia {face}: v {v} -> {v2}");
-                // La faccia è quella giusta: la coordinata normale è scemata.
-                let n = face_normal(face);
-                let arretramento = esterno.add(interno.scale(-1.0)).dot(n);
-                assert!(
-                    arretramento > 0.0,
-                    "faccia {face}: il punto non è arretrato"
-                );
-            }
-        }
-    }
-
-    /// `sensor_point` sceglie il lato dal record salvato.
-    #[test]
-    fn sensor_point_scelta_il_lato_salvato() {
-        let d = dims();
-        let base = SensorPos {
-            name: "S1".to_string(),
-            face: 4,
-            u: 0.4,
-            v: 0.7,
-            inside: false,
-        };
-        let fuori = sensor_point(&base, d);
-
-        let dentro = SensorPos {
-            inside: true,
-            ..base.clone()
-        };
-        let dentro = sensor_point(&dentro, d);
-
-        assert_eq!(
-            fuori,
-            face_point(4, 0.4, 0.7, d),
-            "fuori deve restare sulla parete"
-        );
-        assert_eq!(
-            dentro,
-            inner_point(4, 0.4, 0.7, d),
-            "dentro deve arretrare"
-        );
-        assert!(
-            dentro.z < fuori.z,
-            "il punto interno deve essere più profondo lungo +Z"
-        );
-        assert_ne!(fuori, dentro);
     }
 }

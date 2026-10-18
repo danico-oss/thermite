@@ -541,15 +541,6 @@ static EN: &[(&str, &str)] = &[
         "Save the sensor map as PDF",
     ),
     ("Mappa esportata in PDF:", "Map exported to PDF:"),
-    // Lato di posizionamento dei sensori
-    ("Posizionamento", "Placement"),
-    ("Esterno", "Outside"),
-    ("Interno", "Inside"),
-    ("Lato", "Side"),
-    (
-        "I sensori interni sono fissati appena sotto la parete scelta e restano visibili attraverso il container. Il clic funziona come per l'esterno: scegli il sensore e clicca sulla faccia.",
-        "Inside sensors are attached just beneath the chosen wall and stay visible through the container. Clicking works just like outside: pick the sensor, then click the face.",
-    ),
 ];
 
 // ---------------------------------------------------------------------------
@@ -1032,15 +1023,6 @@ static PT: &[(&str, &str)] = &[
         "Salvar o mapa dos sensores em PDF",
     ),
     ("Mappa esportata in PDF:", "Mapa exportado em PDF:"),
-    // Lado de posicionamento dos sensores
-    ("Posizionamento", "Posicionamento"),
-    ("Esterno", "Externo"),
-    ("Interno", "Interno"),
-    ("Lato", "Lado"),
-    (
-        "I sensori interni sono fissati appena sotto la parete scelta e restano visibili attraverso il container. Il clic funziona come per l'esterno: scegli il sensore e clicca sulla faccia.",
-        "Os sensores internos são fixados logo abaixo da parede escolhida e permanecem visíveis através do contêiner. O clique funciona como no externo: escolha o sensor e clique na face.",
-    ),
 ];
 
 #[cfg(test)]

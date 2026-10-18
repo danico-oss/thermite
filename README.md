@@ -16,10 +16,8 @@ mappa 3D interattiva del container con i sensori posizionati sulle facce.
   sia verticale.
 - **Grafici temporali**: una serie per sensore, con tooltip e valori min/max.
 - **Mappa 3D**: parallelepipedo ruotabile che rappresenta il container, con i
-  sensori posizionati sulle facce secondo i dati del progetto. Ogni sensore si
-  fissa sul lato **esterno** o su quello **interno** della parete su cui si
-  clicca. Container semitrasparente, selezione dei sensori, anteprima ed
-  export PDF.
+  sensori posizionati sulle facce secondo i dati del progetto. Container
+  semitrasparente, selezione dei sensori, anteprima ed export PDF.
 - **Integrità dei dati**: al salvataggio del progetto viene calcolato il CRC32
   del file dati; al caricamento il codice viene riverificato e un file
   modificato viene rifiutato.
@@ -130,47 +128,6 @@ non cambia mai da una rigenerazione all'altra.
 - Il separatore può essere `,` o `;`, ma **non il tabulatore**: un file TSV va
   convertito.
 
-## Mappa 3D dei sensori
-
-La scheda **Sensori 3D** disegna il container come un parallelepipedo
-ruotabile (trascinare per ruotare, rotella per lo zoom). Per posizionare un
-sensore si sceglie dall'elenco a sinistra e si clicca sulla faccia; il clic
-con il tasto destro su un punto già posizionato lo rimuove.
-
-### Lato esterno o interno
-
-Ogni faccia ha due lati, e un sensore va fissato su uno dei due:
-
-| Lato | Segno sulla mappa | Dove si trova |
-| --- | --- | --- |
-| **Esterno** | punto pieno | sulla parete, come su un contenitore chiuso |
-| **Interno** | cerchio cavo | arretrato verso il centro, dentro il volume |
-
-Il lato si sceglie dalla sezione **Posizionamento** prima di cliccare. Il
-clic funziona allo stesso modo in entrambi i casi: il sensore si fissa appena
-sotto la parete che si è cliccata.
-
-Il distacco dalla parete è una frazione costante (12%) della dimensione lungo
-la normale, quindi resta visibile e **non attraversa mai** la parete opposta,
-neppure sui container molto sottili. Le coordinate `u`, `v` sulla faccia sono
-le stesse dei sensori esterni: cambia solo la distanza dal muro.
-
-I sensori interni restano visibili attraverso il container semitrasparente e
-portano un piccolo **badge "Interno"** nell'elenco a sinistra, così si capisce
-dove sono senza dover ruotare la scatola.
-
-### Salvataggio ed esportazione
-
-Le posizioni sono salvate nel database SQLite (tabella `sensor_positions`),
-una per progetto e per sensore: lo stesso sensore non può essere posizionato
-due volte. La colonna `inside` distingue i due lati ed è stata aggiunta con
-una migrazione, quindi i database delle versioni precedenti si aprono senza
-perdita di dati e le vecchie posizioni restano **esterne**, com'erano.
-
-Nell'**anteprima PDF** compare una legenda dei due lati (`● esterno` /
-`◎ interno`), ma solo se il progetto contiene almeno un sensore interno:
-nel PDF non c'è l'elenco laterale che potrebbe spiegarlo.
-
 ## Compilazione
 
 Richiede [Rust](https://rustup.rs/) con toolchain MSVC su Windows (oppure
@@ -220,8 +177,8 @@ versionato.
 cargo test
 ```
 
-Coprono parsing, geometria 3D (incluso il lato interno dei sensori), CRC32,
-migrazione del database, esportazione PDF e disegno dell'icona.
+Coprono parsing, geometria 3D, CRC32, migrazione del database, esportazione PDF
+e disegno dell'icona.
 
 ## Licenza
 

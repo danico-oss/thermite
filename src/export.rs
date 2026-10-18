@@ -853,16 +853,12 @@ mod tests {
                 face: 4,
                 u: 0.25,
                 v: 0.5,
-                inside: false,
             },
-            // Lato interno: il test copre anche la legenda che il PDF deve
-            // mostrare quando uno o più sensori sono dentro il container.
             SensorPos {
                 name: "Sensore 2".to_string(),
                 face: 2,
                 u: 0.7,
                 v: 0.3,
-                inside: true,
             },
         ];
         let stats = vec![

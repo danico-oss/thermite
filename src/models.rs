@@ -49,16 +49,13 @@ impl SceneDims {
 /// Posizione di un sensore su una faccia del parallelepipedo.
 ///
 /// `face` è l'indice della faccia (0..5); `u`, `v` sono coordinate normalizzate
-/// `[0, 1]` sulla faccia. `inside` indica su quale lato della parete il sensore
-/// è fissato: `true` sul lato interno (dentro il volume), `false` su quello
-/// esterno, come nelle versioni precedenti.
+/// `[0, 1]` sulla faccia.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SensorPos {
     pub name: String,
     pub face: usize,
     pub u: f32,
     pub v: f32,
-    pub inside: bool,
 }
 
 /// Le schede della barra multifunzione (una per vista).
@@ -207,31 +204,6 @@ impl Database {
         )
         .expect("Errore creazione tabella sensor_positions");
 
-        // Migrazione: aggiunge la colonna che distingue il lato interno del
-        // sensore da quello esterno, per i database creati da versioni
-        // precedenti. Come per `data_crc32` si interroga lo schema invece di
-        // ignorare l'errore, così un errore vero (es. database in sola lettura)
-        // non viene silenziosamente nascosto.
-        let ha_interno = conn
-            .prepare("PRAGMA table_info(sensor_positions)")
-            .and_then(|mut stmt| {
-                let righe = stmt.query_map([], |r| r.get::<_, String>(1))?; // nome colonna
-                for nome in righe {
-                    if nome? == "inside" {
-                        return Ok(true);
-                    }
-                }
-                Ok(false)
-            })
-            .expect("Impossibile leggere lo schema della tabella sensor_positions");
-        if !ha_interno {
-            conn.execute(
-                "ALTER TABLE sensor_positions ADD COLUMN inside INTEGER NOT NULL DEFAULT 0",
-                [],
-            )
-            .expect("Impossibile aggiungere la colonna inside");
-        }
-
         Self { conn }
     }
 
@@ -309,7 +281,7 @@ impl Database {
     pub fn load_sensor_positions(&self, project_id: i64) -> Vec<SensorPos> {
         let mut out = Vec::new();
         let mut stmt = match self.conn.prepare(
-            "SELECT sensor_name, face, u, v, inside FROM sensor_positions
+            "SELECT sensor_name, face, u, v FROM sensor_positions
              WHERE project_id = ?1 ORDER BY sensor_name ASC",
         ) {
             Ok(s) => s,
@@ -322,10 +294,6 @@ impl Database {
                 face: row.get::<_, i64>(1)? as usize,
                 u: row.get(2)?,
                 v: row.get(3)?,
-                // Il campo è sempre presente dopo la migrazione di `open_at`;
-                // un valore assente viene comunque trattato come esterno, il
-                // comportamento delle versioni precedenti.
-                inside: row.get::<_, i64>(4).map(|v| v != 0).unwrap_or(false),
             })
         });
 
@@ -346,16 +314,9 @@ impl Database {
     ) -> Result<(), String> {
         self.conn
             .execute(
-                "INSERT INTO sensor_positions (project_id, sensor_name, face, u, v, inside)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                (
-                    project_id,
-                    &pos.name,
-                    pos.face as i64,
-                    pos.u,
-                    pos.v,
-                    pos.inside as i64,
-                ),
+                "INSERT INTO sensor_positions (project_id, sensor_name, face, u, v)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                (project_id, &pos.name, pos.face as i64, pos.u, pos.v),
             )
             .map(|_| ())
             .map_err(|e| e.to_string())
@@ -460,102 +421,6 @@ mod tests {
 
         let progetti = db.load_all_projects();
         assert_eq!(progetti[0].data_crc32.as_deref(), Some("CBF43926"));
-
-        let _ = std::fs::remove_file(&percorso);
-    }
-
-    /// Un database creato dalla versione precedente (senza la colonna
-    /// `sensor_positions.inside`) viene migrato: le posizioni vecchie
-    /// sopravvivono e vengono considerate **esterne**, che è l'unico lato che
-    /// esisteva allora.
-    #[test]
-    fn migra_sensor_positions_della_vecchia_versione() {
-        let percorso = db_temporaneo("thermite_migrazione_mappa_prova.db");
-
-        // Schema vecchio, esattamente quello delle versioni precedenti.
-        {
-            let conn = Connection::open(&percorso).unwrap();
-            conn.execute(
-                "CREATE TABLE sensor_positions (
-                    project_id INTEGER NOT NULL,
-                    sensor_name TEXT NOT NULL,
-                    face INTEGER NOT NULL,
-                    u REAL NOT NULL,
-                    v REAL NOT NULL,
-                    PRIMARY KEY (project_id, sensor_name)
-                )",
-                [],
-            )
-            .unwrap();
-            conn.execute(
-                "INSERT INTO sensor_positions (project_id, sensor_name, face, u, v)
-                 VALUES (1, 'Sensore antico', 4, 0.25, 0.75)",
-                [],
-            )
-            .unwrap();
-        }
-
-        // L'apertura con la versione nuova deve migrare lo schema.
-        let db = Database::open_at(&percorso);
-        let posizioni = db.load_sensor_positions(1);
-        assert_eq!(posizioni.len(), 1, "la riga vecchia deve sopravvivere");
-        assert_eq!(posizioni[0].name, "Sensore antico");
-        assert!(
-            !posizioni[0].inside,
-            "le posizioni vecchie erano sempre esterne: deve restare sul muro"
-        );
-        assert!((posizioni[0].u - 0.25).abs() < 1e-6);
-        assert!((posizioni[0].v - 0.75).abs() < 1e-6);
-
-        // Riaprire non deve fallire né duplicare la colonna (ALTER già applicato).
-        let db2 = Database::open_at(&percorso);
-        assert_eq!(db2.load_sensor_positions(1).len(), 1);
-
-        let _ = std::fs::remove_file(&percorso);
-    }
-
-    /// Il lato di posizionamento deve sopravvivere al ciclo
-    /// inserimento → lettura, mentre il vincolo di unicità del sensore resta
-    /// validissimo.
-    #[test]
-    fn la_posizione_interna_sopravvive_al_salvataggio() {
-        let percorso = db_temporaneo("thermite_mappa_interna_prova.db");
-        let db = Database::open_at(&percorso);
-
-        let dentro = SensorPos {
-            name: "Dentro".to_string(),
-            face: 3,
-            u: 0.2,
-            v: 0.9,
-            inside: true,
-        };
-        let fuori = SensorPos {
-            name: "Fuori".to_string(),
-            face: 0,
-            u: 0.8,
-            v: 0.1,
-            inside: false,
-        };
-        db.insert_sensor_position(7, &dentro).unwrap();
-        db.insert_sensor_position(7, &fuori).unwrap();
-
-        let caricate = db.load_sensor_positions(7);
-        assert_eq!(caricate.len(), 2);
-
-        let d = caricate.iter().find(|p| p.name == "Dentro").expect("dentro");
-        assert!(d.inside, "il lato interno deve essere stato riletto");
-        assert_eq!(d.face, 3);
-        assert!((d.u - 0.2).abs() < 1e-6, "u = {}", d.u);
-        assert!((d.v - 0.9).abs() < 1e-6, "v = {}", d.v);
-
-        let f = caricate.iter().find(|p| p.name == "Fuori").expect("fuori");
-        assert!(!f.inside, "il lato esterno deve restare esterno");
-
-        // Il lato non indebolisce il vincolo di unicità.
-        assert!(
-            db.insert_sensor_position(7, &dentro).is_err(),
-            "lo stesso sensore non può essere posizionato due volte"
-        );
 
         let _ = std::fs::remove_file(&percorso);
     }

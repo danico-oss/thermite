@@ -154,7 +154,6 @@ impl ViewState {
         let mut zoom = self.map_zoom;
         let positions = self.map_positions.clone();
         let mut selected = self.map_selected.clone();
-        let mut inside = self.map_inside;
 
         let mut dims_changed = false;
         let mut place: Option<(usize, f32, f32)> = None;
@@ -290,51 +289,6 @@ impl ViewState {
 
                     theme::card(ui, |ui| {
                         ui.set_width(ui.available_width());
-                        theme::section_title(ui, i18n::t(lang, "Posizionamento"));
-                        ui.add_space(4.0);
-                        ui.horizontal(|ui| {
-                            for (valore, testo) in [
-                                (false, i18n::t(lang, "Esterno")),
-                                (true, i18n::t(lang, "Interno")),
-                            ] {
-                                let attivo = inside == valore;
-                                // Stessa dicitura della selezione dei sensori:
-                                // il nome resta leggibile, la scelta è segnalata
-                                // solo dalla cornice accent.
-                                let mut etichetta = RichText::new(testo)
-                                    .size(11.5)
-                                    .color(theme::text_strong(dark));
-                                if attivo {
-                                    etichetta = etichetta.strong();
-                                }
-                                let resp = ui.selectable_label(false, etichetta);
-                                if attivo {
-                                    ui.painter().rect_stroke(
-                                        resp.rect.expand(2.0),
-                                        CornerRadius::same(3),
-                                        Stroke::new(1.4_f32, theme::accent(dark)),
-                                        StrokeKind::Inside,
-                                    );
-                                }
-                                if resp.clicked() {
-                                    inside = valore;
-                                }
-                            }
-                        });
-                        ui.add_space(4.0);
-                        theme::hint(
-                            ui,
-                            i18n::t(
-                                lang,
-                                "I sensori interni sono fissati appena sotto la parete scelta e restano visibili attraverso il container. Il clic funziona come per l'esterno: scegli il sensore e clicca sulla faccia.",
-                            ),
-                        );
-                    });
-
-                    ui.add_space(6.0);
-
-                    theme::card(ui, |ui| {
-                        ui.set_width(ui.available_width());
                         theme::section_title(ui, i18n::t(lang, "Sensori del progetto"));
                         ui.add_space(4.0);
 
@@ -392,24 +346,6 @@ impl ViewState {
                                                     .color(theme::muted(dark)),
                                             );
                                             if is_placed {
-                                                // Solo i sensori interni portano il
-                                                // badge: l'esterno è il caso
-                                                // predefinito e sarebbe rumore.
-                                                let interno = positions
-                                                    .iter()
-                                                    .find(|p| &p.name == name)
-                                                    .map(|p| p.inside)
-                                                    .unwrap_or(false);
-                                                if interno {
-                                                    ui.label(
-                                                        RichText::new(i18n::t(
-                                                            lang,
-                                                            "Interno",
-                                                        ))
-                                                        .size(9.5)
-                                                        .color(theme::accent(dark)),
-                                                    );
-                                                }
                                                 ui.with_layout(
                                                     egui::Layout::right_to_left(
                                                         egui::Align::Center,
@@ -520,7 +456,6 @@ impl ViewState {
         self.map_pitch = pitch;
         self.map_zoom = zoom;
         self.map_selected = selected;
-        self.map_inside = inside;
 
         if dims_changed {
             if let Err(e) = db.save_scene_dims(proj.id, self.map_dims) {
@@ -546,7 +481,6 @@ impl ViewState {
                             face,
                             u,
                             v,
-                            inside,
                         };
                         match db.insert_sensor_position(proj.id, &pos) {
                             Ok(()) => {
@@ -790,7 +724,9 @@ fn draw_scene(
     for (i, p) in positions.iter().enumerate() {
         let (x, y) = proj.project(scene3d::sensor_point(p, dims));
         let center = egui::pos2(x, y);
-        draw_marker(painter, center, theme::series_color(i), p.inside);
+        let color = theme::series_color(i);
+        painter.circle_filled(center, 5.0, color);
+        painter.circle_stroke(center, 5.0, Stroke::new(1.2_f32, Color32::WHITE));
 
         let (lo, hi) = stats
             .iter()
@@ -798,25 +734,6 @@ fn draw_scene(
             .map(|(_, a, b)| (*a, *b))
             .unwrap_or((f32::NAN, f32::NAN));
         draw_label(painter, center + Vec2::new(9.0, -10.0), &p.name, lo, hi, style);
-    }
-}
-
-/// Segno di un sensore: **pieno** se è fissato sulla parete esterna, **cavo**
-/// se è all'interno del volume.
-///
-/// La forma, non il colore, distingue i due lati: il colore è già occupato
-/// dall'indice della serie. Il centro resta vuoto apposta, così si vede il
-/// container attraverso il sensore interno.
-fn draw_marker(painter: &egui::Painter, center: egui::Pos2, color: Color32, inside: bool) {
-    if inside {
-        // Alone chiaro: la mappa è semitrasparente e l'anello deve leggersi
-        // sopra la parete, sopra il reticolo e anche sopra un altro sensore.
-        painter.circle_stroke(center, 5.1, Stroke::new(3.6_f32, Color32::WHITE));
-        painter.circle_stroke(center, 4.5, Stroke::new(2.4_f32, color));
-        painter.circle_filled(center, 1.7, color);
-    } else {
-        painter.circle_filled(center, 5.0, color);
-        painter.circle_stroke(center, 5.0, Stroke::new(1.2_f32, Color32::WHITE));
     }
 }
 
@@ -929,46 +846,6 @@ fn draw_map_page(painter: &egui::Painter, page: Rect, preview: &MapPreview, lang
         FontId::proportional(fs(8.5)),
         muted_c,
     );
-
-    // Legenda dei due lati. Nel PDF non c'è l'elenco laterale che etichetta i
-    // sensori, quindi il segno cavo va spiegato qui. Compare solo se ci sono
-    // sensori interni: altrimenti sarebbe rumore su ogni esportazione.
-    if preview.positions.iter().any(|p| p.inside) {
-        let font = FontId::proportional(fs(8.5));
-        let r = 1.4_f32;
-        let gap = fs(7.0);
-        let misura = |t: &str| painter.layout_no_wrap(t.to_string(), font.clone(), muted_c);
-
-        let g_lab = misura(&format!("{}:", i18n::t(lang, "Lato")));
-        let g_est = misura(i18n::t(lang, "Esterno"));
-        let g_int = misura(i18n::t(lang, "Interno"));
-
-        // Le larghezze vanno lette prima di passare le galley a `galley()`,
-        // che le consuma.
-        let w_lab = g_lab.size().x;
-        let w_est = g_est.size().x;
-        let h = g_lab.size().y;
-        let ancoraggio = mm(LEFT, 176.0);
-        let top = ancoraggio.y - h;
-        let cy = top + h * 0.5;
-        let mut x = ancoraggio.x;
-
-        painter.galley(egui::pos2(x, top), g_lab, muted_c);
-        x += w_lab + gap;
-
-        // Punto pieno = esterno.
-        painter.circle_filled(egui::pos2(x + r, cy), r, ink);
-        x += r * 2.0 + gap * 0.5;
-        painter.galley(egui::pos2(x, top), g_est, muted_c);
-        x += w_est + gap;
-
-        // Cerchio cavo = interno: la stessa forma usata sulla mappa.
-        let cx = x + r;
-        painter.circle_stroke(egui::pos2(cx, cy), r, Stroke::new(1.1_f32, ink));
-        painter.circle_filled(egui::pos2(cx, cy), r * 0.35, ink);
-        x += r * 2.0 + gap * 0.5;
-        painter.galley(egui::pos2(x, top), g_int, muted_c);
-    }
 
     // Area della scena
     let area = Rect::from_two_pos(mm(LEFT, BOTTOM), mm(RIGHT, TOP));

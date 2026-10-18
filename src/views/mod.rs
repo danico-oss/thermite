@@ -65,8 +65,6 @@ pub struct ViewState {
     pub map_zoom: f32,
     pub map_positions: Vec<SensorPos>,
     pub map_selected: Option<String>,
-    /// Lato su cui il prossimo clic fissa il sensore: `true` = interno.
-    pub map_inside: bool,
     pub map_preview: Option<MapPreview>,
 }
 
@@ -102,7 +100,6 @@ impl ViewState {
             map_zoom: 1.0,
             map_positions: Vec::new(),
             map_selected: None,
-            map_inside: false,
             map_preview: None,
         }
     }
